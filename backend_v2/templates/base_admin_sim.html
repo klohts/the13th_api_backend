@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>{% block title %}THE13TH · Simulation Studio{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/static/css/admin.css" />
+  <style>
+    :root {
+      --bg-dark: #050712;
+      --bg-deep: #050718;
+      --bg-card: #0d1020;
+      --bg-card-soft: #111326;
+      --purple-50: #f5ecff;
+      --purple-100: #e3c9ff;
+      --purple-300: #c193ff;
+      --purple-500: #9b5cff;
+      --purple-600: #7b3fe3;
+      --purple-900: #2b0b55;
+      --accent-amber: #fbbf24;
+      --accent-green: #34d399;
+      --accent-red: #fb7185;
+      --accent-cyan: #22d3ee;
+      --border-subtle: rgba(255,255,255,0.06);
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+      background: radial-gradient(circle at top left, #3b0764 0, #020617 45%, #000 100%);
+      color: #e5e7eb;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .app-sidebar {
+      background: linear-gradient(180deg, #020617 0%, #020617 40%, #020617 100%);
+      border-right: 1px solid var(--border-subtle);
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .app-logo {
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #f9fafb;
+    }
+
+    .app-logo span {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: radial-gradient(circle at top left, #a855f7, #4c1d95);
+      margin-right: 6px;
+    }
+
+    .sidebar-section-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+
+    .nav-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 18px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      color: #9ca3af;
+      text-decoration: none;
+      transition: all 150ms ease-out;
+    }
+
+    .nav-link span.label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-link:hover {
+      background: rgba(148,163,184,0.08);
+      color: #e5e7eb;
+    }
+
+    .nav-link.active {
+      background: linear-gradient(90deg, #7c3aed, #ec4899);
+      color: #f9fafb;
+      box-shadow: 0 0 0 1px rgba(250,250,250,0.06), 0 14px 35px rgba(15,23,42,0.9);
+    }
+
+    .nav-pill {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.45);
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .nav-link.active .nav-pill {
+      border-color: rgba(248,250,252,0.7);
+      color: #f9fafb;
+      background: rgba(15,23,42,0.35);
+    }
+
+    .nav-footnote {
+      margin-top: auto;
+      font-size: 11px;
+      color: #6b7280;
+      line-height: 1.5;
+    }
+
+    .nav-footnote strong {
+      color: #e5e7eb;
+      font-weight: 500;
+    }
+
+    .app-main {
+      padding: 22px 28px 32px;
+      background:
+        radial-gradient(circle at top left, rgba(168,85,247,0.33) 0, transparent 55%),
+        radial-gradient(circle at bottom right, rgba(59,130,246,0.2) 0, transparent 55%),
+        linear-gradient(145deg, var(--bg-dark), var(--bg-deep));
+      position: relative;
+    }
+
+    .app-main-inner {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    .page-tagline {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: #a5b4fc;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .page-tagline-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px rgba(52,211,153,0.7);
+    }
+
+    .page-header-main {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 10px;
+    }
+
+    .page-title {
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      color: #f9fafb;
+    }
+
+    .page-subtitle {
+      margin-top: 6px;
+      font-size: 14px;
+      color: #9ca3af;
+      max-width: 540px;
+    }
+
+    .page-header-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    .pill-soft {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.45);
+      background: rgba(15,23,42,0.6);
+      color: #e5e7eb;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pill-soft-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--accent-cyan);
+      box-shadow: 0 0 10px rgba(56,189,248,0.8);
+    }
+
+    .page-main-grid {
+      margin-top: 24px;
+      {% block page_main_grid_style %}{% endblock %}
+    }
+
+    .card {
+      border-radius: 20px;
+      background: radial-gradient(circle at top left, rgba(148,163,184,0.15) 0, rgba(15,23,42,0.95) 40%);
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 18px 45px rgba(15,23,42,0.95);
+    }
+
+    .card-soft {
+      border-radius: 18px;
+      background: var(--bg-card-soft);
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 16px 32px rgba(15,23,42,0.9);
+    }
+
+    .card-muted {
+      border-radius: 16px;
+      background: rgba(15,23,42,0.85);
+      border: 1px solid rgba(148,163,184,0.15);
+    }
+
+    .shadow-subtle {
+      box-shadow: 0 10px 30px rgba(15,23,42,0.9);
+    }
+
+    .btn-primary {
+      border-radius: 999px;
+      padding: 9px 18px;
+      font-size: 13px;
+      border: none;
+      cursor: pointer;
+      background: linear-gradient(90deg, #a855f7, #ec4899);
+      color: #f9fafb;
+      font-weight: 500;
+      box-shadow: 0 14px 40px rgba(109,40,217,0.85);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 120ms ease-out, box-shadow 120ms ease-out, filter 120ms ease-out;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+      box-shadow: 0 18px 45px rgba(109,40,217,0.95);
+    }
+
+    .btn-subtle {
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 12px;
+      background: rgba(15,23,42,0.7);
+      border: 1px solid rgba(148,163,184,0.5);
+      color: #e5e7eb;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: #9ca3af;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 22px;
+      font-weight: 600;
+      color: #f9fafb;
+    }
+
+    .metric-sub {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 2px;
+    }
+
+    .badge-pill {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .badge-green {
+      background: rgba(22,163,74,0.2);
+      color: #bbf7d0;
+      border: 1px solid rgba(34,197,94,0.8);
+    }
+
+    .badge-amber {
+      background: rgba(217,119,6,0.2);
+      color: #fed7aa;
+      border: 1px solid rgba(245,158,11,0.8);
+    }
+
+    .badge-pink {
+      background: rgba(219,39,119,0.25);
+      color: #f9a8d4;
+      border: 1px solid rgba(236,72,153,0.8);
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.45);
+      font-size: 11px;
+      color: #e5e7eb;
+    }
+
+    .chip-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--accent-amber);
+    }
+
+    .fade-in-up {
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity 320ms ease-out, transform 320ms ease-out;
+    }
+
+    .fade-in-up[data-animate="in"] {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 960px) {
+      .app-shell {
+        grid-template-columns: 64px minmax(0, 1fr);
+      }
+      .app-sidebar {
+        padding-inline: 10px;
+      }
+      .app-logo span {
+        padding-inline: 8px;
+      }
+      .nav-link span.label-text {
+        display: none;
+      }
+      .nav-footnote {
+        display: none;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .app-shell {
+        display: block;
+      }
+      .app-sidebar {
+        flex-direction: row;
+        align-items: center;
+        overflow-x: auto;
+        gap: 10px;
+        border-right: none;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+      .app-main {
+        padding: 18px 16px 26px;
+      }
+      .page-header-main {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .page-header-meta {
+        align-items: flex-start;
+      }
+    }
+  </style>
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="app-shell">
+  <aside class="app-sidebar">
+    <div class="app-logo">
+      <span>13</span> THE13TH
+    </div>
+
+    <div>
+      <div class="sidebar-section-label">Simulation</div>
+      <div class="nav-group">
+        <a href="/admin/sim-client/inspector"
+           class="nav-link {% if active_nav == 'inspector' %}active{% endif %}">
+          <span class="label">
+            <span>📊</span>
+            <span class="label-text">Portfolio Inspector</span>
+          </span>
+          <span class="nav-pill">Overview</span>
+        </a>
+        <a href="/admin/client-experience"
+           class="nav-link {% if active_nav == 'client-experience' %}active{% endif %}">
+          <span class="label">
+            <span>🎬</span>
+            <span class="label-text">Client Journey Studio</span>
+          </span>
+          <span class="nav-pill">Live Demo</span>
+        </a>
+        <a href="/admin/sim-lab"
+           class="nav-link {% if active_nav == 'lab' %}active{% endif %}">
+          <span class="label">
+            <span>🧪</span>
+            <span class="label-text">Simulation Lab</span>
+          </span>
+          <span class="nav-pill">Lab</span>
+        </a>
+        <a href="/admin/email-log"
+           class="nav-link {% if active_nav == 'email-log' %}active{% endif %}">
+          <span class="label">
+            <span>✉️</span>
+            <span class="label-text">Email Intelligence</span>
+          </span>
+          <span class="nav-pill">Threads</span>
+        </a>
+      </div>
+    </div>
+
+    <div>
+      <div class="sidebar-section-label">Account</div>
+      <div class="nav-group">
+        <a href="/admin/billing"
+           class="nav-link {% if active_nav == 'billing' %}active{% endif %}">
+          <span class="label">
+            <span>💳</span>
+            <span class="label-text">Billing & Plans</span>
+          </span>
+          <span class="nav-pill">Plan</span>
+        </a>
+        <a href="/admin/audit-log"
+           class="nav-link {% if active_nav == 'audit' %}active{% endif %}">
+          <span class="label">
+            <span>📁</span>
+            <span class="label-text">Audit Log</span>
+          </span>
+          <span class="nav-pill">History</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="nav-footnote">
+      <strong>Simulation Studio</strong><br />
+      Play out your pipeline as a client,<br />
+      before a single real lead is touched.
+    </div>
+  </aside>
+
+  <main class="app-main">
+    <div class="app-main-inner">
+      {% block header %}
+      <div class="page-tagline">
+        <span class="page-tagline-dot"></span>
+        Client Experience · Simulation Studio
+      </div>
+
+      <div class="page-header-main">
+        <div>
+          <div class="page-title">
+            {% block page_title %}Watch a single lead’s entire journey{% endblock %}
+          </div>
+          <p class="page-subtitle">
+            {% block page_subtitle %}
+            THE13TH simulates every reply, delay, and decision so you can feel your pipeline from the client’s side.
+            {% endblock %}
+          </p>
+        </div>
+
+        <div class="page-header-meta">
+          <span class="pill-soft">
+            <span class="pill-soft-dot"></span>
+            Simulation mode: <strong style="margin-left:4px;">Live demo</strong>
+          </span>
+          <span>Persona: {{ persona_label|default("Hot Buyer") }} · Window: {{ simulation_days|default(30) }} days</span>
+        </div>
+      </div>
+      {% endblock %}
+
+      <div class="page-main-grid">
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  // Simple intersection-based animation
+  const els = document.querySelectorAll(".fade-in-up");
+  if (IntersectionObserver && els.length) {
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.dataset.animate = "in";
+          obs.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.1 });
+
+    els.forEach(el => obs.observe(el));
+  } else {
+    els.forEach(el => el.dataset.animate = "in");
+  }
+</script>
+
+{% block extra_body %}{% endblock %}
+</body>
+</html>

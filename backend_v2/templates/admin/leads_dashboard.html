@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>THE13TH · Admin Leads Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="min-h-screen bg-slate-950 text-slate-100">
+<div class="max-w-7xl mx-auto px-6 py-10">
+
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-10">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight">THE13TH · Admin Leads</h1>
+            <p class="text-base text-slate-300 mt-1">
+                Live lead pipeline across brokerages.
+            </p>
+        </div>
+
+        <form class="flex flex-col md:flex-row gap-3 md:items-center" method="get">
+            <input
+                type="text"
+                name="search"
+                value="{{ search or '' }}"
+                placeholder="Search name, email, brokerage..."
+                class="rounded-xl bg-slate-900 border border-slate-600 px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-sky-500"
+            />
+            <select
+                name="status"
+                class="rounded-xl bg-slate-900 border border-slate-600 px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+                <option value="">All statuses</option>
+                {% for value in ["new", "contacted", "qualified", "converted", "lost"] %}
+                    <option value="{{ value }}" {% if status == value %}selected{% endif %}>
+                        {{ value|capitalize }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <button
+                type="submit"
+                class="rounded-xl border border-slate-500 bg-slate-800 px-5 py-2.5 text-base font-semibold hover:bg-slate-700"
+            >
+                Filter
+            </button>
+        </form>
+    </header>
+
+    {# Quick stats bar derived purely from current leads list #}
+    {% set ns = namespace(total=0, new=0, contacted=0, qualified=0, converted=0, lost=0) %}
+    {% for lead in leads %}
+        {% set ns.total = ns.total + 1 %}
+        {% if lead.status == "new" %}{% set ns.new = ns.new + 1 %}{% endif %}
+        {% if lead.status == "contacted" %}{% set ns.contacted = ns.contacted + 1 %}{% endif %}
+        {% if lead.status == "qualified" %}{% set ns.qualified = ns.qualified + 1 %}{% endif %}
+        {% if lead.status == "converted" %}{% set ns.converted = ns.converted + 1 %}{% endif %}
+        {% if lead.status == "lost" %}{% set ns.lost = ns.lost + 1 %}{% endif %}
+    {% endfor %}
+
+    <section class="mb-6 grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3">
+            <p class="text-xs uppercase tracking-wide text-slate-400">Total</p>
+            <p class="mt-1 text-2xl font-semibold">{{ ns.total }}</p>
+        </div>
+        <a href="?status=new{% if search %}&search={{ search | urlencode }}{% endif %}"
+           class="rounded-2xl border border-sky-800 bg-sky-950/40 px-4 py-3 hover:border-sky-500 hover:bg-sky-900/40 transition">
+            <p class="text-xs uppercase tracking-wide text-sky-300">New</p>
+            <p class="mt-1 text-2xl font-semibold text-sky-100">{{ ns.new }}</p>
+        </a>
+        <a href="?status=contacted{% if search %}&search={{ search | urlencode }}{% endif %}"
+           class="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 hover:border-slate-600 hover:bg-slate-800/80 transition">
+            <p class="text-xs uppercase tracking-wide text-slate-300">Contacted</p>
+            <p class="mt-1 text-2xl font-semibold">{{ ns.contacted }}</p>
+        </a>
+        <a href="?status=qualified{% if search %}&search={{ search | urlencode }}{% endif %}"
+           class="rounded-2xl border border-emerald-800 bg-emerald-950/40 px-4 py-3 hover:border-emerald-500 hover:bg-emerald-900/40 transition">
+            <p class="text-xs uppercase tracking-wide text-emerald-300">Qualified</p>
+            <p class="mt-1 text-2xl font-semibold text-emerald-100">{{ ns.qualified }}</p>
+        </a>
+        <a href="?status=converted{% if search %}&search={{ search | urlencode }}{% endif %}"
+           class="rounded-2xl border border-amber-800 bg-amber-950/40 px-4 py-3 hover:border-amber-500 hover:bg-amber-900/40 transition">
+            <p class="text-xs uppercase tracking-wide text-amber-300">Converted</p>
+            <p class="mt-1 text-2xl font-semibold text-amber-100">{{ ns.converted }}</p>
+        </a>
+    </section>
+
+    <!-- Leads Table -->
+    <section class="rounded-2xl border border-slate-800 bg-slate-900 shadow-xl overflow-hidden">
+        <div class="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+            <h2 class="text-lg font-semibold tracking-wide text-slate-100">
+                Leads ({{ leads|length }})
+                {% if status %}
+                    <span class="text-sm text-slate-400 ml-2">· Status: {{ status|capitalize }}</span>
+                {% endif %}
+                {% if search %}
+                    <span class="text-sm text-slate-400 ml-2">· Search: “{{ search }}”</span>
+                {% endif %}
+            </h2>
+            <p class="text-sm text-slate-400">
+                Limit: {{ limit }}
+            </p>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-base">
+                <thead class="bg-slate-900 border-b border-slate-800">
+                    <tr>
+                        <th class="px-5 py-3 text-left font-semibold text-slate-300">Created</th>
+                        <th class="px-5 py-3 text-left font-semibold text-slate-300">Brokerage</th>
+                        <th class="px-5 py-3 text-left font-semibold text-slate-300">Lead</th>
+                        <th class="px-5 py-3 text-left font-semibold text-slate-300">Status</th>
+                        <th class="px-5 py-3 text-left font-semibold text-slate-300">Source</th>
+                        <th class="px-5 py-3 text-left font-semibold text-slate-300">Agent</th>
+                        <th class="px-5 py-3 text-left font-semibold text-slate-300">Price Range</th>
+                    </tr>
+                </thead>
+
+                <tbody class="divide-y divide-slate-800">
+                {% if leads and leads|length > 0 %}
+                    {% for lead in leads %}
+                    <tr class="hover:bg-slate-800/80 transition">
+                        <td class="px-5 py-4 text-slate-300">
+                            {{ lead.created_at.strftime("%Y-%m-%d %H:%M") if lead.created_at else "—" }}
+                        </td>
+
+                        <td class="px-5 py-4">
+                            <div class="font-semibold text-slate-100">
+                                {{ lead.brokerage_name }}
+                            </div>
+                            <div class="text-sm text-slate-400">
+                                {{ lead.email }}
+                            </div>
+                        </td>
+
+                        <td class="px-5 py-4">
+                            <div class="text-slate-100 font-medium">
+                                {{ lead.first_name }} {{ lead.last_name }}
+                            </div>
+                            {% if lead.phone %}
+                            <div class="text-sm text-slate-400">
+                                {{ lead.phone }}
+                            </div>
+                            {% endif %}
+                        </td>
+
+                        <td class="px-5 py-4">
+                            <span class="inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold
+                                         {% if lead.status == 'new' %}
+                                            bg-sky-900/60 text-sky-200
+                                         {% elif lead.status == 'contacted' %}
+                                            bg-slate-800 text-slate-100
+                                         {% elif lead.status == 'qualified' %}
+                                            bg-emerald-900/60 text-emerald-200
+                                         {% elif lead.status == 'converted' %}
+                                            bg-amber-900/70 text-amber-200
+                                         {% elif lead.status == 'lost' %}
+                                            bg-rose-900/60 text-rose-200
+                                         {% else %}
+                                            bg-slate-800 text-slate-100
+                                         {% endif %}
+                            ">
+                                {{ lead.status or "new" | capitalize }}
+                            </span>
+                        </td>
+
+                        <td class="px-5 py-4 text-slate-200">
+                            {{ lead.source or "—" }}
+                        </td>
+
+                        <td class="px-5 py-4 text-slate-200">
+                            {{ lead.assigned_agent or "Unassigned" }}
+                        </td>
+
+                        <td class="px-5 py-4 font-semibold text-slate-100">
+                            {{ lead.price_range or "—" }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-10 text-center text-lg text-slate-400">
+                            No leads yet. Once your funnels start pushing data into THE13TH,
+                            new leads will appear here in real time.
+                        </td>
+                    </tr>
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+</body>
+</html>

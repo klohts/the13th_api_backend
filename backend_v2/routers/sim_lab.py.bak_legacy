@@ -1,0 +1,38 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import HTMLResponse, JSONResponse
+from sqlalchemy.orm import Session
+
+from backend_v2.database import get_db
+from backend_v2.services.auth_service import authenticated_admin
+from backend_v2.services.sim_lab_service import get_sim_overview
+from backend_v2.services.render import render_template
+
+router = APIRouter(prefix="/admin/sim-lab", tags=["Admin → Sim Lab"])
+
+@router.get("/", response_class=HTMLResponse)
+def sim_lab_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    admin = Depends(authenticated_admin),
+):
+    # Try to render an existing template; if missing, fallback to simple HTML
+    try:
+        context = {
+            "request": request,
+            "user": admin,
+            "active": "sim-lab",
+        }
+        html = render_template("admin/admin_simlab.html", context)
+    except Exception:
+        html = "<h1>Simulation Lab</h1><p>Template not found.</p>"
+    return HTMLResponse(html)
+
+@router.get("/overview-data", response_class=JSONResponse)
+def sim_lab_overview_data(
+    db: Session = Depends(get_db),
+    admin = Depends(authenticated_admin),
+):
+    overview = get_sim_overview(db)
+    return JSONResponse(overview)

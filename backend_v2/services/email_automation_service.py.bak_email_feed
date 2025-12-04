@@ -1,0 +1,87 @@
+from __future__ import annotations
+
+import logging
+from datetime import datetime
+from typing import Optional
+
+from sqlmodel import Session
+
+from backend_v2.models.sim_email_log import SimEmailLog
+from backend_v2.services.ai_writer_service import ai_writer  # your AI writer
+
+logger = logging.getLogger("the13th.email_automation")
+
+
+class EmailAutomationService:
+    """
+    Hybrid mode (Option C):
+
+    - send_simulated_email: generates + stores email content in SimEmailLog
+      (used by the simulation engine / client experience)
+    - send_real_demo_email: hook for your real Gmail/Zapier pipeline for
+      a one-off "send me this demo email" experience.
+    """
+
+    @staticmethod
+    def send_simulated_email(
+        db: Session,
+        lead_id: int,
+        day_index: int,
+        persona_key: str,
+        prompt: str,
+        subject: Optional[str] = None,
+    ) -> SimEmailLog:
+        logger.info(
+            "[SIM-EMAIL] lead_id=%s day=%s persona=%s",
+            lead_id,
+            day_index,
+            persona_key,
+        )
+
+        # Use your existing AI writer
+        try:
+            body = ai_writer.ai_writer.generate_reply(prompt=prompt, persona=persona_key)
+        except Exception as exc:  # defensive
+            logger.exception("Error generating simulated email: %s", exc)
+            body = "(Simulation placeholder email body)"
+
+        if not body:
+            body = "(Simulation email with no content returned from AI)"
+
+        log = SimEmailLog(
+            lead_id=lead_id,
+            day_index=day_index,
+            direction="assistant",
+            subject=subject or "Follow-up from your agent",
+            body=body,
+            created_at=datetime.utcnow(),
+        )
+
+        db.add(log)
+        db.commit()
+        db.refresh(log)
+
+        return log
+
+    @staticmethod
+    def send_real_demo_email(email: str, subject: str, body: str) -> bool:
+        """
+        Option C hybrid: only used when an admin explicitly hits a "Send me
+        this demo email" CTA. This is where you plug your real Zapier/Gmail
+        HTTP call.
+
+        For now this is a stub that just logs success.
+        """
+        try:
+            logger.info(
+                "[REAL-DEMO-EMAIL] To=%s | Subject=%s | BodyLen=%s",
+                email,
+                subject,
+                len(body or ""),
+            )
+            # Example integration (pseudo-code):
+            # requests.post(ZAPIER_WEBHOOK_URL, json={"email": email, "subject": subject, "body": body})
+            return True
+        except Exception as exc:
+            logger.exception("Error sending real demo email: %s", exc)
+            return False

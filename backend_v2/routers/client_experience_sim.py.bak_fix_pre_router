@@ -1,0 +1,439 @@
+# backend_v2/routers/client_experience_sim.py
+from __future__ import annotations
+
+import logging
+from math import ceil
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
+
+from backend_v2.database import get_db
+from backend_v2.services.auth_service import authenticated_admin
+from backend_v2.services.render import render_template
+from backend_v2.sim_client_engine import run_client_simulation, get_available_personas
+from backend_v2.services.client_experience_insights import build_revealable_insights, build_comparison_differences
+
+
+from backend_v2.services.client_experience_metrics import (
+    compute_kpis,
+    JourneyEvent,
+)
+
+logger = logging.getLogger("the13th.client_experience_sim")
+
+@router.get("", response_class=HTMLResponse)
+def client_experience_page(
+    request: Request,
+    persona: str = Query("ghosting_lead"),
+    days: int = Query(30),
+    db: Session = Depends(get_db),
+):
+    """
+    THE13TH — Unified Client Experience Route
+    Builds simulation, KPIs, stage/intent graphs, insights, narrative.
+    """
+
+    # 1. Build the simulation
+    simulation = run_full_client_simulation(persona, days, db)
+
+    # 2. Compute KPIs
+    summary = compute_client_experience_summary(simulation)
+    kpi_strip = build_kpi_strip(simulation, summary)
+
+    # 3. Build graph data
+    stage_graph = build_stage_progress_graph(simulation)
+    activity_graph = build_activity_graph(simulation)
+
+    # 4. Build insights
+    revealable_insights = build_revealable_insights(simulation, summary)
+    narrative = build_simulation_narrative(simulation, summary)
+    decision_tree = build_decision_tree(simulation, summary)
+
+    # 5. Final context
+    context = {
+        "simulation": simulation,
+        "summary": summary,
+        "kpi_strip": kpi_strip,
+        "stage_graph": stage_graph,
+        "activity_graph": activity_graph,
+        "revealable_insights": revealable_insights,
+        "narrative": narrative,
+        "decision_tree": decision_tree,
+        "persona": persona,
+        "days": days,
+    }
+
+    return render_template("admin_sim_client_experience.html", context)
+
+
+router = APIRouter(
+    prefix="/admin/client-experience",
+    tags=["Client Experience Simulation"],
+)
+
+@router.get("", response_class=HTMLResponse)
+def client_experience_page(
+    request: Request,
+    persona: str = Query("ghosting_lead"),
+    days: int = Query(30),
+    db: Session = Depends(get_db),
+):
+    """
+    Unified Client Experience route.
+    """
+    simulation = run_full_client_simulation(persona, days, db)
+
+    summary = compute_client_experience_summary(simulation)
+    kpi_strip = build_kpi_strip(simulation, summary)
+    stage_graph = build_stage_progress_graph(simulation)
+    activity_graph = build_activity_graph(simulation)
+
+    revealable_insights = build_revealable_insights(simulation, summary)
+    narrative = build_simulation_narrative(simulation, summary)
+    decision_tree = build_decision_tree(simulation, summary)
+
+    context = {
+        "simulation": simulation,
+        "summary": summary,
+        "kpi_strip": kpi_strip,
+        "stage_graph": stage_graph,
+        "activity_graph": activity_graph,
+        "revealable_insights": revealable_insights,
+        "narrative": narrative,
+        "decision_tree": decision_tree,
+        "persona": persona,
+        "days": days,
+    }
+
+    return render_template("admin_sim_client_experience.html", context)
+
+
+# ---------------------------------------------------------------------------
+# SUMMARY BUILDER
+# ---------------------------------------------------------------------------
+
+
+def compute_client_experience_summary(
+    simulation: Optional[Dict[str, Any]]
+) -> Dict[str, Any]:
+    summary: Dict[str, Any] = {
+        "lead_profile": {
+            "label": "Not enough data yet",
+            "summary": "Run a 30-day simulation to profile this lead.",
+            "rhythm": "—",
+        },
+        "assistant_pattern": {
+            "label": "No pattern detected yet",
+            "summary": "Assistant behaviour will be summarised after at least a few messages.",
+        },
+        "journey": {
+            "start_stage": "—",
+            "end_stage": "—",
+            "path": "",
+            "days": 0,
+        },
+        "metrics": {
+            "convert_prob": 0.0,
+            "dropoff_prob": 0.0,
+            "intensity_score": 0.0,
+        },
+    }
+
+    if not simulation or not isinstance(simulation, dict):
+        return summary
+
+    events = simulation.get("events") or []
+    if not isinstance(events, list) or not events:
+        return summary
+
+    days_seen = set()
+    client_msgs = 0
+    assistant_msgs = 0
+    stages: List[str] = []
+
+    for ev in events:
+        if not isinstance(ev, dict):
+            continue
+
+        day = ev.get("day") or ev.get("day_index") or ev.get("d")
+        if day is not None:
+            days_seen.add(day)
+
+        stage = ev.get("stage_after") or ev.get("stage") or ""
+        if stage and (not stages or stages[-1] != stage):
+            stages.append(str(stage))
+
+        sender_raw = (
+            ev.get("actor") or ev.get("sender") or ev.get("from") or ""
+        ).lower()
+        if sender_raw in {"lead", "client", "buyer", "prospect"}:
+            client_msgs += 1
+        elif sender_raw in {"assistant", "agent", "ai", "system"}:
+            assistant_msgs += 1
+
+    total_msgs = client_msgs + assistant_msgs
+    days_count = max(len(days_seen), 1)
+
+    # Lead profile
+    if client_msgs == 0:
+        lead_label = "Silent / unresponsive"
+        rhythm = "No replies observed yet."
+    elif client_msgs <= ceil(days_count * 0.3):
+        lead_label = "Low-frequency responder"
+        rhythm = "Occasional replies with long gaps."
+    elif client_msgs <= ceil(days_count * 0.7):
+        lead_label = "Steady engager"
+        rhythm = "Regular replies across the journey."
+    else:
+        lead_label = "High-intent, high-engagement"
+        rhythm = "Very active throughout the journey."
+
+    summary["lead_profile"]["label"] = lead_label
+    summary["lead_profile"]["rhythm"] = rhythm
+    summary["lead_profile"]["summary"] = (
+        f"{client_msgs} client messages over {days_count} day(s)."
+    )
+
+    # Assistant pattern
+    if assistant_msgs == 0:
+        assist_label = "Assistant has not engaged yet"
+        assist_summary = "No outbound messages from the assistant were recorded."
+    else:
+        ratio = assistant_msgs / max(client_msgs, 1)
+        if ratio < 0.8:
+            assist_label = "Conservative follow-up"
+            assist_summary = "Assistant replied selectively."
+        elif ratio <= 1.5:
+            assist_label = "Balanced follow-up"
+            assist_summary = "Assistant maintained a healthy reply rhythm."
+        else:
+            assist_label = "High-touch assistant"
+            assist_summary = "Assistant followed up aggressively."
+
+    summary["assistant_pattern"]["label"] = assist_label
+    summary["assistant_pattern"]["summary"] = (
+        assist_summary + f" ({assistant_msgs} messages from assistant.)"
+    )
+
+    if stages:
+        summary["journey"]["start_stage"] = stages[0]
+        summary["journey"]["end_stage"] = stages[-1]
+        summary["journey"]["path"] = (
+            " → ".join(stages) if len(stages) > 1 else stages[0]
+        )
+
+    summary["journey"]["days"] = days_count
+
+    # Probability heuristics
+    end_stage_lower = str(summary["journey"]["end_stage"]).lower()
+    high_intent_keywords = ["high intent", "hot", "engaged", "active", "under contract"]
+    converted_keywords = ["won", "closed won", "converted"]
+
+    convert_prob = 0.1
+    drop_prob = 0.3
+
+    if any(k in end_stage_lower for k in converted_keywords):
+        convert_prob = 0.95
+        drop_prob = 0.02
+    elif any(k in end_stage_lower for k in high_intent_keywords):
+        convert_prob = 0.75
+        drop_prob = 0.15
+    elif "cold" in end_stage_lower or "lost" in end_stage_lower:
+        convert_prob = 0.15
+        drop_prob = 0.7
+    else:
+        if client_msgs >= days_count:
+            convert_prob = 0.55
+            drop_prob = 0.25
+        elif client_msgs == 0:
+            convert_prob = 0.05
+            drop_prob = 0.8
+        else:
+            convert_prob = 0.35
+            drop_prob = 0.4
+
+    intensity = min(1.0, total_msgs / float(days_count * 4))
+
+    summary["metrics"]["convert_prob"] = round(convert_prob, 2) * 100.0
+    summary["metrics"]["dropoff_prob"] = round(drop_prob, 2) * 100.0
+    summary["metrics"]["intensity_score"] = round(intensity * 100.0, 1)
+
+    return summary
+
+
+# ---------------------------------------------------------------------------
+# NARRATIVE BUILDER
+# ---------------------------------------------------------------------------
+
+
+def build_narrative_summary(summary: Dict[str, Any]) -> str:
+    lp = summary.get("lead_profile", {})
+    ap = summary.get("assistant_pattern", {})
+    jr = summary.get("journey", {})
+    mt = summary.get("metrics", {})
+
+    lead_label = lp.get("label", "the lead")
+    rhythm = lp.get("rhythm", "")
+    assist_label = ap.get("label", "the assistant")
+    assist_summary = ap.get("summary", "")
+
+    start_stage = jr.get("start_stage", "—")
+    end_stage = jr.get("end_stage", "—")
+    path = jr.get("path", "")
+    days = jr.get("days", 0)
+
+    convert_prob = mt.get("convert_prob", 0)
+    drop_prob = mt.get("dropoff_prob", 0)
+    intensity = mt.get("intensity_score", 0)
+
+    narrative = (
+        f"This simulated client exhibited **{lead_label.lower()}** behaviour over "
+        f"a **{days}-day** journey. Rhythm: _{rhythm}_.\n\n"
+        f"The assistant showed **{assist_label.lower()}** behaviour "
+        f"— _{assist_summary}_\n\n"
+    )
+
+    if path:
+        narrative += (
+            f"Journey path: **{path}** (from {start_stage} → {end_stage}).\n\n"
+        )
+
+    narrative += (
+        f"Engagement intensity: **{intensity}%**.\n\n"
+        f"Estimated conversion probability: **{convert_prob}%**, "
+        f"drop-off risk: **{drop_prob}%**."
+    )
+
+    return narrative
+
+
+# ---------------------------------------------------------------------------
+# DECISION TREE
+# ---------------------------------------------------------------------------
+
+
+def build_decision_tree(
+    simulation: Optional[Dict[str, Any]]
+) -> List[Dict[str, str]]:
+    if not simulation or "events" not in simulation:
+        return []
+
+    events = simulation.get("events", [])
+    decisions = []
+
+    for ev in events:
+        if not isinstance(ev, dict):
+            continue
+
+        day = ev.get("day") or ev.get("day_index") or ev.get("d") or 0
+        sender = (ev.get("actor") or ev.get("sender") or ev.get("from") or "").lower()
+        content = ev.get("text") or ev.get("message") or ""
+
+        stage_before = ev.get("stage_before") or ev.get("stage") or ""
+        stage_after = ev.get("stage_after") or stage_before
+
+        explanation = None
+
+        if sender in {"lead", "client", "prospect", "buyer"}:
+            explanation = (
+                "Lead sent a short message → light follow-up cadence."
+                if len(content) < 40
+                else "Lead sent a detailed message → assistant escalated engagement."
+            )
+        elif sender in {"assistant", "agent", "ai"}:
+            if "?" in content:
+                explanation = "Assistant prompted the lead with a question."
+            elif "follow" in content.lower():
+                explanation = "Assistant executed scheduled follow-up."
+            else:
+                explanation = "Routine assistant touchpoint."
+
+        if stage_after != stage_before:
+            explanation = (
+                f"Stage shift: **{stage_before} → {stage_after}**. "
+                f"Assistant adapted strategy."
+            )
+
+        if explanation:
+            decisions.append({"day": day, "explanation": explanation})
+
+    decisions.sort(key=lambda x: x["day"])
+    return decisions
+
+
+# ---------------------------------------------------------------------------
+# MAIN ROUTE — WITH REAL KPI STRIP
+# ---------------------------------------------------------------------------
+
+
+@router.get("", response_class=HTMLResponse)
+def client_experience_page(
+    request: Request,
+    persona: str = Query("hot_lead"),
+    days: int = Query(30, ge=7, le=60),
+    db: Session = Depends(get_db),
+    admin: Any = Depends(authenticated_admin),
+) -> HTMLResponse:
+    try:
+        personas = get_available_personas()
+    except Exception as exc:
+        logger.exception("Error fetching personas: %s", exc)
+        personas = []
+
+    simulation: Optional[Dict[str, Any]] = None
+    try:
+        simulation = run_client_simulation(days=days, persona_key=persona)
+
+        graphs = (simulation or {}).get("graphs", None)
+        if isinstance(graphs, list):
+            named = {}
+            for g in graphs:
+                label = (
+                    (g.get("label") or "")
+                    .lower()
+                    .replace(" ", "_")
+                    .replace("-", "_")
+                )
+                if label:
+                    named[label] = g
+            simulation["graphs"] = named
+
+    except Exception as exc:
+        logger.exception("Error generating client simulation: %s", exc)
+        simulation = None
+
+    summary = compute_client_experience_summary(simulation)
+    narrative = build_narrative_summary(summary)
+    decision_tree = build_decision_tree(simulation)
+
+
+    revealable_insights = build_revealable_insights(simulation, summary)
+
+
+
+    sim_a = run_client_simulation(persona=persona_a, days=days, db=db)
+    sim_b = run_client_simulation(persona=persona_b, days=days, db=db)
+
+    summary_a = compute_client_experience_summary(sim_a)
+    summary_b = compute_client_experience_summary(sim_b)
+
+    insights_a = build_revealable_insights(sim_a, summary_a)
+    insights_b = build_revealable_insights(sim_b, summary_b)
+
+    return render_template(
+        "admin_sim_client_compare.html",
+        {
+            "sim_a": sim_a,
+            "sim_b": sim_b,
+            "summary_a": summary_a,
+            "summary_b": summary_b,
+            "insights_a": insights_a,
+            "insights_b": insights_b,
+            "persona_a": persona_a,
+            "persona_b": persona_b,
+            "days": days,
+        },
+    )

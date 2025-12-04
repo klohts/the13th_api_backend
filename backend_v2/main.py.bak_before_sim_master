@@ -1,0 +1,112 @@
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+from backend_v2.routers import (
+    sim_client_inspector,
+    sim_client_dashboard,
+    public,
+    admin_dashboard,
+    client_dashboard,
+    admin_tenants,
+    billing,
+    sim_lab,
+    sim_email,
+    client_experience_sim,
+)
+
+# Agent Drilldown Router
+from backend_v2.routers.sim_client_agent import router as sim_client_agent_router
+
+# Landing Page and Public Routes
+from backend_v2.routers.public_intel import router as public_intel_router
+
+# Admin Reports
+from backend_v2.routers import admin_reports
+from backend_v2.routers.admin_reports import router as admin_reports_router
+
+# Client Simulation Engine (must be imported before app creation)
+from backend_v2.client_sim_all_in_one import client_sim_router
+
+from backend_v2.logging_config import configure_logging
+from backend_v2.services.render import TEMPLATE_DIR
+
+configure_logging()
+logger = logging.getLogger("backend_v2.main")
+
+
+# ------------------------------------------------------------------------------
+# APP FACTORY
+# ------------------------------------------------------------------------------
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title="THE13TH backend_v2",
+        version="0.1.0",
+    )
+
+    # --------------------------------------------------------------------------
+    # CORS
+    # --------------------------------------------------------------------------
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # --------------------------------------------------------------------------
+    # STATIC FILES
+    # --------------------------------------------------------------------------
+    base_dir = Path(__file__).resolve().parents[1]
+    static_dir = base_dir / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+    # --------------------------------------------------------------------------
+    # ROUTERS (Load order matters)
+    # --------------------------------------------------------------------------
+    app.include_router(public.router)
+    app.include_router(admin_dashboard.router)
+    app.include_router(client_dashboard.router)
+    app.include_router(admin_tenants.router)
+    app.include_router(billing.router)
+    app.include_router(sim_lab.router)
+    app.include_router(sim_email.router)
+    app.include_router(sim_client_inspector.router)
+    app.include_router(sim_client_agent_router)
+    app.include_router(public_intel_router)
+    # Admin Reports (include once only)
+    app.include_router(admin_reports_router)
+
+    # Client Simulation Engine (must remain last due to dynamic routes)
+    app.include_router(client_sim_router())
+
+    # Client Experience Simulation Flow
+    app.include_router(client_experience_sim.router)
+
+    return app
+
+
+# ------------------------------------------------------------------------------
+# CREATE APP INSTANCE
+# ------------------------------------------------------------------------------
+app = create_app()
+
+
+# ------------------------------------------------------------------------------
+# DEBUG ROUTE
+# ------------------------------------------------------------------------------
+@app.get("/health")
+def health_check() -> dict:
+    return {"status": "ok"}
+
+
+@app.get("/debug/templates")
+def debug_templates():
+    return {"template_dir": str(TEMPLATE_DIR)}

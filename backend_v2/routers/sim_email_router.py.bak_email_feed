@@ -1,0 +1,52 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, Form, Request
+from sqlmodel import Session
+
+from backend_v2.database import get_db
+from backend_v2.services.auth_service import authenticated_admin
+from backend_v2.services.email_automation_service import EmailAutomationService
+
+router = APIRouter(prefix="/admin/sim-email", tags=["Email Automation"])
+
+
+@router.post("/send")
+def send_sim_email(
+    request: Request,
+    lead_id: int = Form(...),
+    day_index: int = Form(...),
+    persona_key: str = Form(...),
+    prompt: str = Form("Write a polite follow-up email."),
+    subject: str = Form("Quick follow-up on your property search"),
+    db: Session = Depends(get_db),
+    admin=Depends(authenticated_admin),
+):
+    """
+    Simulation-only email write. Does NOT send real email — it just logs to
+    SimEmailLog so the client experience + sim lab can read from it.
+    """
+    log = EmailAutomationService.send_simulated_email(
+        db=db,
+        lead_id=lead_id,
+        day_index=day_index,
+        persona_key=persona_key,
+        prompt=prompt,
+        subject=subject,
+    )
+    return {"status": "ok", "email_id": log.id}
+
+
+@router.post("/send-real")
+def send_real_demo_email(
+    request: Request,
+    email: str = Form(...),
+    subject: str = Form("Demo Email from THE13TH"),
+    body: str = Form("Preview of how THE13TH would email your leads."),
+    admin=Depends(authenticated_admin),
+):
+    """
+    Real demo email: this is the only place where we attempt to send an
+    actual email (via your external integration).
+    """
+    ok = EmailAutomationService.send_real_demo_email(email=email, subject=subject, body=body)
+    return {"status": "sent" if ok else "error"}

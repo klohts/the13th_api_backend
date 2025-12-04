@@ -1,0 +1,76 @@
+from __future__ import annotations
+
+import os
+import logging
+from typing import Any
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy.orm import Session
+
+from backend_v2.database import get_db, SessionLocal
+from backend_v2.services.render import render_template
+from backend_v2.services.auth_service import authenticated_admin
+from backend_v2.services.report_service import run_weekly_report
+from backend_v2.services.report_email import send_weekly_report
+
+logger = logging.getLogger("the13th.admin.reports")
+
+router = APIRouter(prefix="/admin/reports", tags=["Admin Reports"])
+
+
+# ------------------------------------------------------------
+# LIST REPORTS (PRIMARY ADMIN PAGE)
+# ------------------------------------------------------------
+@router.get("/", response_class=HTMLResponse)
+def reports_list(
+    request: Request,
+    admin: Any = Depends(authenticated_admin),
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """
+    Weekly Intelligence Reports list.
+    """
+    logs = db.execute(
+        "SELECT * FROM sim_reports_log ORDER BY generated_at DESC LIMIT 50"
+    ).mappings().all()
+
+    context = {
+        "logs": logs,
+        "active": "reports",
+    }
+
+    html = render_template("admin_reports.html", context)
+    return HTMLResponse(content=html)
+
+
+# ------------------------------------------------------------
+# GENERATE A NEW REPORT (MANUAL TRIGGER)
+# ------------------------------------------------------------
+@router.post("/generate-now", response_class=HTMLResponse)
+def generate_now(
+    request: Request,
+    admin=Depends(authenticated_admin),
+):
+    """
+    Manually generate the weekly report and immediately send via email.
+    """
+    db = SessionLocal()
+    try:
+        outdir = os.path.join(os.getcwd(), "data", "reports")
+        filepath = run_weekly_report(db, outdir)
+
+        recipient = os.getenv("THE13TH_REPORT_RECIPIENT")
+        if recipient:
+            send_weekly_report(recipient, filepath)
+
+        logger.info(f"Manual weekly report generated → {filepath}")
+
+        return RedirectResponse(url="/admin/reports", status_code=303)
+
+    except Exception as e:
+        logger.exception("Failed to generate weekly intelligence report: %s", e)
+        return HTMLResponse("Failed to generate report", status_code=500)
+
+    finally:
+        db.close()

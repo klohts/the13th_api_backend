@@ -1,0 +1,165 @@
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timedelta
+from typing import List, Sequence
+
+from sqlmodel import SQLModel, select
+from sqlalchemy.orm import Session
+
+from backend_v2.database import engine
+from backend_v2.models.email_log import EmailLog
+from backend_v2.services.ai_writer_service import AIWriterService
+
+logger = logging.getLogger("the13th.email_automation_service")
+
+
+def init_email_log_table() -> None:
+    """Ensure the EmailLog table exists.
+
+    Safe to call multiple times; SQLModel will no-op if already created.
+    """
+    try:
+        SQLModel.metadata.create_all(bind=engine)
+        logger.info("Ensured EmailLog table exists.")
+    except Exception as exc:
+        logger.exception("Failed to ensure EmailLog table exists: %s", exc)
+
+
+class EmailAutomationService:
+    """High-level helper for logging + reading email events."""
+
+    def __init__(self, db: Session) -> None:
+        self.db = db
+        self.ai_writer = AIWriterService()
+
+    # ------------------------------------------------------------------
+    # Core CRUD
+    # ------------------------------------------------------------------
+    def log_email(
+        self,
+        *,
+        lead_identifier: str,
+        direction: str,
+        sender_label: str,
+        subject: str,
+        body: str,
+        meta: str | None = None,
+    ) -> EmailLog:
+        event = EmailLog(
+            lead_identifier=lead_identifier,
+            direction=direction,
+            sender_label=sender_label,
+            subject=subject,
+            body=body,
+            meta=meta,
+        )
+        self.db.add(event)
+        self.db.commit()
+        self.db.refresh(event)
+        logger.info(
+            "Logged email event dir=%s sender=%s lead=%s id=%s",
+            direction,
+            sender_label,
+            lead_identifier,
+            event.id,
+        )
+        return event
+
+    def list_recent(self, *, limit: int = 40) -> List[EmailLog]:
+        statement = (
+            select(EmailLog)
+            .order_by(EmailLog.created_at.desc())
+            .limit(limit)
+        )
+        results: Sequence[EmailLog] = self.db.execute(statement).scalars().all()
+        # Reverse to show oldest at top, newest at bottom in the bubble feed
+        return list(reversed(list(results)))
+
+    # ------------------------------------------------------------------
+    # Demo helpers
+    # ------------------------------------------------------------------
+    def seed_demo_thread(self, lead_identifier: str = "DEMO-LEAD-001") -> None:
+        """Populate a deterministic demo thread if no data exists."""
+        existing = self.db.execute(
+            select(EmailLog).where(EmailLog.lead_identifier == lead_identifier).limit(1)
+        ).scalars().first()
+        if existing:
+            logger.info("Demo thread already exists for %s, skipping seed.", lead_identifier)
+            return
+
+        now = datetime.utcnow()
+
+        messages = [
+            {
+                "direction": "inbound_lead",
+                "sender_label": "Buyer — Skyline Estates",
+                "subject": "Looking at 3-bed options in Northside",
+                "body": (
+                    "Hi, I'm exploring 3-bed homes around Northside over the next 30 days. "
+                    "Budget is around $750k and I'd like something walkable."
+                ),
+                "offset_min": -42,
+            },
+            {
+                "direction": "outbound_ai",
+                "sender_label": "THE13TH Assistant",
+                "subject": "Re: 3-bed options in Northside",
+                "body": (
+                    "Thanks for reaching out — based on your price range and timing, "
+                    "we can shortlist 6 properties that match your criteria and typical "
+                    "buyer patterns in your segment. When would you like to tour?"
+                ),
+                "offset_min": -39,
+            },
+            {
+                "direction": "inbound_lead",
+                "sender_label": "Buyer — Skyline Estates",
+                "subject": "Re: 3-bed options in Northside",
+                "body": (
+                    "Saturday mornings are best. Also curious about how competitive "
+                    "the market is right now."
+                ),
+                "offset_min": -36,
+            },
+            {
+                "direction": "outbound_ai",
+                "sender_label": "THE13TH Assistant",
+                "subject": "Touring schedule + competitiveness",
+                "body": (
+                    "Great — Saturdays work. We’re seeing strong activity in your bracket, "
+                    "with 3–5 offers on well-priced listings. We'll prioritize homes where "
+                    "your probability of winning is above the local median."
+                ),
+                "offset_min": -30,
+            },
+            {
+                "direction": "system",
+                "sender_label": "System Insight",
+                "subject": "Engagement score updated",
+                "body": (
+                    "Lead engagement score moved from 62 → 78 after the last reply. "
+                    "AI recommends scheduling a tour within the next 72 hours."
+                ),
+                "offset_min": -25,
+            },
+        ]
+
+        for msg in messages:
+            timestamp = now + timedelta(minutes=msg["offset_min"])
+            event = EmailLog(
+                lead_identifier=lead_identifier,
+                direction=msg["direction"],
+                sender_label=msg["sender_label"],
+                subject=msg["subject"],
+                body=msg["body"],
+                created_at=timestamp,
+            )
+            self.db.add(event)
+
+        self.db.commit()
+        logger.info("Seeded demo email thread for %s with %d messages", lead_identifier, len(messages))
+
+
+# Ensure table exists when the module is first imported.
+init_email_log_table()

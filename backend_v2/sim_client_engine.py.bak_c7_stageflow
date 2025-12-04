@@ -1,0 +1,465 @@
+# backend_v2/sim_client_engine.py
+
+from __future__ import annotations
+
+import logging
+import random
+from dataclasses import dataclass, asdict
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Literal
+
+logger = logging.getLogger("the13th.client_sim_engine")
+
+Stage = Literal["New", "Engaged", "Warm", "Active", "High Intent", "Converted", "Lost"]
+Actor = Literal["client", "assistant", "system"]
+
+
+@dataclass
+class PersonaConfig:
+    key: str
+    label: str
+    description: str
+    starting_stage: Stage
+    reply_chance: float          # probability client replies on a given day
+    proactive_chance: float      # probability assistant nudges on a given day
+    drop_off_chance: float       # probability lead drops off
+    revive_chance: float         # probability of reactivation from "Lost"
+
+
+@dataclass
+class SimEvent:
+    day_index: int
+    actor: Actor
+    stage_before: Stage
+    stage_after: Stage
+    message: str
+    time_label: str
+
+
+# ---------------------------------------------------------------------------
+# Personas (Lead Nurture focused)
+# ---------------------------------------------------------------------------
+
+_PERSONAS: Dict[str, PersonaConfig] = {
+    "curious_buyer": PersonaConfig(
+        key="curious_buyer",
+        label="Curious Buyer",
+        description="Asks questions, compares options, responds steadily to good follow-up.",
+        starting_stage="New",
+        reply_chance=0.45,
+        proactive_chance=0.55,
+        drop_off_chance=0.05,
+        revive_chance=0.15,
+    ),
+    "hot_lead": PersonaConfig(
+        key="hot_lead",
+        label="Hot Lead",
+        description="Highly engaged, fast replies, quickly moves to High Intent and conversion.",
+        starting_stage="Engaged",
+        reply_chance=0.70,
+        proactive_chance=0.60,
+        drop_off_chance=0.03,
+        revive_chance=0.10,
+    ),
+    "slow_drip": PersonaConfig(
+        key="slow_drip",
+        label="Slow Drip Lead",
+        description="Long nurture, low-frequency replies, eventually moves or drops.",
+        starting_stage="New",
+        reply_chance=0.25,
+        proactive_chance=0.65,
+        drop_off_chance=0.06,
+        revive_chance=0.25,
+    ),
+    "ghosting_lead": PersonaConfig(
+        key="ghosting_lead",
+        label="Ghosting Lead",
+        description="Engages early then goes quiet, can sometimes be revived.",
+        starting_stage="Warm",
+        reply_chance=0.30,
+        proactive_chance=0.65,
+        drop_off_chance=0.12,
+        revive_chance=0.30,
+    ),
+    "investor": PersonaConfig(
+        key="investor",
+        label="Investor Lead",
+        description="Direct, numbers-driven, quick to respond to the right deals.",
+        starting_stage="Engaged",
+        reply_chance=0.55,
+        proactive_chance=0.55,
+        drop_off_chance=0.04,
+        revive_chance=0.12,
+    ),
+}
+
+
+def get_available_personas() -> List[Dict[str, str]]:
+    return [
+        {
+            "key": p.key,
+            "label": p.label,
+            "description": p.description,
+        }
+        for p in _PERSONAS.values()
+    ]
+
+
+def _get_persona(key: str) -> PersonaConfig:
+    if key in _PERSONAS:
+        return _PERSONAS[key]
+    logger.warning("Unknown persona %s; falling back to 'hot_lead'", key)
+    return _PERSONAS["hot_lead"]
+
+
+# ---------------------------------------------------------------------------
+# Stage transitions and text generators
+# ---------------------------------------------------------------------------
+
+_STAGE_FLOW: List[Stage] = ["New", "Engaged", "Warm", "Active", "High Intent", "Converted"]
+
+
+def _next_stage(current: Stage, positive: bool, rnd: random.Random) -> Stage:
+    if current in ("Converted", "Lost"):
+        return current
+
+    if not positive:
+        # small chance of slip towards Lost
+        if rnd.random() < 0.4:
+            return "Lost"
+        return current
+
+    try:
+        idx = _STAGE_FLOW.index(current)
+    except ValueError:
+        return current
+
+    if idx >= len(_STAGE_FLOW) - 1:
+        return "Converted"
+
+    # 70% chance to move forward positively, otherwise stay
+    if rnd.random() < 0.7:
+        return _STAGE_FLOW[idx + 1]
+    return current
+
+
+def _client_message_for(stage: Stage, persona: PersonaConfig, rnd: random.Random) -> str:
+    if stage == "New":
+        return rnd.choice(
+            [
+                "Hi, I saw one of your listings and wanted to learn more.",
+                "I'm just starting to look and curious what the process looks like.",
+            ]
+        )
+    if stage == "Engaged":
+        return rnd.choice(
+            [
+                "Thanks for the info — a few more questions about neighborhoods.",
+                "This is helpful. Could you narrow things down based on my budget?",
+            ]
+        )
+    if stage == "Warm":
+        return rnd.choice(
+            [
+                "These options look promising. What would you recommend I focus on?",
+                "I like a couple of these. Can we go a bit deeper on the pros/cons?",
+            ]
+        )
+    if stage == "Active":
+        return rnd.choice(
+            [
+                "I'm ready to move on something soon. What do you think is realistic?",
+                "This week is good for me. What next step do you recommend?",
+            ]
+        )
+    if stage == "High Intent":
+        return rnd.choice(
+            [
+                "I want to move forward. Can we prepare next steps?",
+                "This looks like a fit. Let's talk about numbers and timing.",
+            ]
+        )
+    if stage == "Converted":
+        return rnd.choice(
+            [
+                "Appreciate the guidance — this feels like the right move.",
+                "Thanks for helping me navigate everything. I'm excited.",
+            ]
+        )
+    if stage == "Lost":
+        return rnd.choice(
+            [
+                "Thanks for your time — I've decided to pause for now.",
+                "I ended up going a different direction, but I appreciate the help.",
+            ]
+        )
+    return "Just checking in about the process."
+
+
+def _assistant_message_for(stage: Stage, persona: PersonaConfig, rnd: random.Random) -> str:
+    if stage == "New":
+        return rnd.choice(
+            [
+                "Here’s a quick rundown of the process and a few options that match what you shared.",
+                "I’ve put together a short list tailored around your budget and ideal timeline.",
+            ]
+        )
+    if stage == "Engaged":
+        return rnd.choice(
+            [
+                "Based on what you’ve told me so far, here are three paths that could work for you.",
+                "I’ve refined the options and highlighted pros/cons so you can compare clearly.",
+            ]
+        )
+    if stage == "Warm":
+        return rnd.choice(
+            [
+                "Here’s a short priority list so you don’t have to sift through everything.",
+                "I’ve summarized what we’ve learned so far and the next two best steps.",
+            ]
+        )
+    if stage == "Active":
+        return rnd.choice(
+            [
+                "Here’s a simple plan for the next 7–10 days so you can move confidently.",
+                "Based on the pace and options, this is the window where decisions tend to work best.",
+            ]
+        )
+    if stage == "High Intent":
+        return rnd.choice(
+            [
+                "Here’s a clean breakdown of numbers, timing, and what to expect from each move.",
+                "I’ve mapped your preferences to the best actionable option right now.",
+            ]
+        )
+    if stage == "Converted":
+        return rnd.choice(
+            [
+                "I’ll keep you updated on any follow-ups so nothing slips through.",
+                "I’ve captured the key details and next dates so you don’t have to remember them.",
+            ]
+        )
+    if stage == "Lost":
+        return rnd.choice(
+            [
+                "If anything changes or timing opens up again, I can pick this up for you instantly.",
+                "I’ll keep a light watch on the market in case something perfect appears.",
+            ]
+        )
+    return "I’ve summarized this into a simple next step so it’s easy to act on."
+
+
+def _system_summary_for(day: int, stage: Stage, converted: bool, lost: bool) -> str:
+    if converted:
+        return f"Day {day}: Lead reached a clear decision and converted from nurture."
+    if lost:
+        return f"Day {day}: Lead is currently classified as Lost; light-touch nurture may revive later."
+    if stage in ("High Intent", "Active"):
+        return f"Day {day}: Lead is in a high-intent posture; maintain focused, concise communication."
+    if stage in ("Warm", "Engaged"):
+        return f"Day {day}: Lead is warming up; value-driven education is working."
+    return f"Day {day}: Early-stage nurture; the system is still shaping context and trust."
+
+
+# ---------------------------------------------------------------------------
+# Core simulation
+# ---------------------------------------------------------------------------
+
+
+def build_conversation_graph(events: List[SimEvent], days: int) -> Dict[str, Any]:
+    """Build simple stage + message timelines for graph cards.
+
+    Returns a dict with:
+    - stage_timeline: [{day, stage, stage_index}]
+    - message_timeline: [{day, client, assistant, system}]
+    """
+    # Map stages to an ordinal so the template can render a simple bar height
+    stage_order: Dict[Stage, int] = {stage: idx for idx, stage in enumerate(_STAGE_FLOW)}
+
+    stage_timeline: List[Dict[str, Any]] = []
+    message_timeline: List[Dict[str, Any]] = []
+
+    last_stage: Stage = "New"
+
+    for day in range(1, days + 1):
+        day_events = [e for e in events if e.day_index == day]
+
+        if day_events:
+            last_stage = day_events[-1].stage_after
+
+        stage_index = stage_order.get(last_stage, 0)
+        stage_timeline.append(
+            {
+                "day": day,
+                "stage": last_stage,
+                "stage_index": stage_index,
+            }
+        )
+
+        counts = {"day": day, "client": 0, "assistant": 0, "system": 0}
+        for ev in day_events:
+            if ev.actor == "client":
+                counts["client"] += 1
+            elif ev.actor == "assistant":
+                counts["assistant"] += 1
+            else:
+                counts["system"] += 1
+        message_timeline.append(counts)
+
+    return {
+        "stage_timeline": stage_timeline,
+        "message_timeline": message_timeline,
+    }
+
+
+def run_client_simulation(
+    *,
+    days: int = 30,
+    persona_key: str = "hot_lead",
+    seed: int | None = None,
+) -> Dict[str, Any]:
+    """
+    Run an in-memory lead nurture simulation for a single persona.
+
+    Returns a dict safe for Jinja / JSON with:
+      - persona_* fields
+      - stats
+      - events: List[Dict]
+    """
+    if days < 7:
+        days = 7
+    if days > 90:
+        days = 90
+
+    persona = _get_persona(persona_key)
+    rnd = random.Random(seed or int(datetime.utcnow().timestamp()))
+
+    current_stage: Stage = persona.starting_stage
+    events: List[SimEvent] = []
+
+    client_msg_count = 0
+    assistant_msg_count = 0
+    system_msg_count = 0
+
+    for day in range(1, days + 1):
+        day_label = f"Day {day}"
+        day_start = datetime.utcnow() - timedelta(days=(days - day))
+
+        day_had_client = False
+        day_had_assistant = False
+
+        # 1) Client behavior
+        if current_stage not in ("Converted", "Lost"):
+            if rnd.random() < persona.reply_chance:
+                client_msg = _client_message_for(current_stage, persona, rnd)
+                new_stage = _next_stage(current_stage, positive=True, rnd=rnd)
+
+                events.append(
+                    SimEvent(
+                        day_index=day,
+                        actor="client",
+                        stage_before=current_stage,
+                        stage_after=new_stage,
+                        message=client_msg,
+                        time_label=f"{day_label} — {day_start.strftime('%I:%M %p')}",
+                    )
+                )
+                client_msg_count += 1
+                day_had_client = True
+                current_stage = new_stage
+
+        # 2) Potential drop-off
+        if current_stage not in ("Converted", "Lost"):
+            if rnd.random() < persona.drop_off_chance:
+                lost_stage: Stage = "Lost"
+                lost_msg = _client_message_for(lost_stage, persona, rnd)
+                events.append(
+                    SimEvent(
+                        day_index=day,
+                        actor="client",
+                        stage_before=current_stage,
+                        stage_after=lost_stage,
+                        message=lost_msg,
+                        time_label=f"{day_label} — {day_start.strftime('%I:%M %p')}",
+                    )
+                )
+                client_msg_count += 1
+                current_stage = lost_stage
+
+        # 3) Assistant proactive touch
+        if current_stage not in ("Converted", "Lost"):
+            if rnd.random() < persona.proactive_chance or not day_had_client:
+                asst_msg = _assistant_message_for(current_stage, persona, rnd)
+                # Sometimes a proactive touch nudges the stage
+                new_stage = _next_stage(current_stage, positive=True, rnd=rnd) if rnd.random() < 0.3 else current_stage
+
+                events.append(
+                    SimEvent(
+                        day_index=day,
+                        actor="assistant",
+                        stage_before=current_stage,
+                        stage_after=new_stage,
+                        message=asst_msg,
+                        time_label=f"{day_label} — {(day_start + timedelta(hours=6)).strftime('%I:%M %p')}",
+                    )
+                )
+                assistant_msg_count += 1
+                day_had_assistant = True
+                current_stage = new_stage
+
+        # 4) Potential revival from Lost
+        if current_stage == "Lost" and rnd.random() < persona.revive_chance:
+            revived_stage: Stage = "Warm"
+            revive_msg = "Replied to a nurture message after going quiet — back in the conversation."
+            events.append(
+                SimEvent(
+                    day_index=day,
+                    actor="client",
+                    stage_before=current_stage,
+                    stage_after=revived_stage,
+                    message=revive_msg,
+                    time_label=f"{day_label} — {(day_start + timedelta(hours=9)).strftime('%I:%M %p')}",
+                )
+            )
+            client_msg_count += 1
+            current_stage = revived_stage
+
+        # 5) System daily summary
+        converted = current_stage == "Converted"
+        lost = current_stage == "Lost"
+        summary_msg = _system_summary_for(day, current_stage, converted, lost)
+        events.append(
+            SimEvent(
+                day_index=day,
+                actor="system",
+                stage_before=current_stage,
+                stage_after=current_stage,
+                message=summary_msg,
+                time_label=f"{day_label} — {(day_start + timedelta(hours=20)).strftime('%I:%M %p')}",
+            )
+        )
+        system_msg_count += 1
+
+    converted_flag = any(e.stage_after == "Converted" for e in events)
+    final_stage: Stage = current_stage
+
+    # Prepare safe dict for templates
+    events_payload: List[Dict[str, Any]] = [asdict(e) for e in events]
+    graphs = build_conversation_graph(events, days)
+
+    return {
+        "persona_key": persona.key,
+        "persona_label": persona.label,
+        "persona_description": persona.description,
+        "days": days,
+        "final_stage": final_stage,
+        "converted": converted_flag,
+        "events": events_payload,
+        "graphs": graphs,
+        "stats": {
+            "client_messages": client_msg_count,
+            "assistant_messages": assistant_msg_count,
+            "system_messages": system_msg_count,
+            "total_messages": client_msg_count + assistant_msg_count + system_msg_count,
+        },
+    }

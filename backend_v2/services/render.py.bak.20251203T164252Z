@@ -1,0 +1,25 @@
+from typing import Dict, Any, Final
+from pathlib import Path
+from fastapi.templating import Jinja2Templates
+
+# Project base = .../the13th/backend_v2
+BACKEND_BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent
+
+# Folder where your HTML/Jinja templates live
+# If they are in the project root's "templates", change to:
+# TEMPLATE_DIR = BACKEND_BASE_DIR.parent / "templates"
+TEMPLATE_DIR: Final[Path] = BACKEND_BASE_DIR / "templates"
+
+
+def get_template_dir() -> Path:
+    """
+    Return the directory containing HTML/Jinja templates.
+    Centralized here so other modules can reuse it.
+    """
+    return TEMPLATE_DIR
+
+templates = Jinja2Templates(directory="templates")
+
+def render_template(template_name: str, context: Dict[str, Any]):
+    print(">>> RENDERING TEMPLATE:", template_name)
+    return templates.TemplateResponse(template_name, context)

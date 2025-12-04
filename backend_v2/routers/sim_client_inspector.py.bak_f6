@@ -1,0 +1,99 @@
+from __future__ import annotations
+
+import logging
+from typing import Any, Dict
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
+
+from backend_v2.database import get_db
+from backend_v2.services.auth_service import authenticated_admin
+from backend_v2.services.render import render_template
+from backend_v2.client_sim_all_in_one import (
+    get_client_sim_overview,
+    simulate_client_day,
+    get_client_sim_history,
+)
+
+logger = logging.getLogger("backend_v2.sim_client_inspector")
+
+router = APIRouter(prefix="/admin/sim-client", tags=["Client Simulation Inspector"])
+
+
+def _build_context(db: Session, result: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    """
+    Shared context builder for full and partial inspector views.
+    """
+    snapshot = get_client_sim_overview(db)
+    history = get_client_sim_history()
+
+    # Simple status movements summary for now
+    status_movements: Dict[str, int] = {}
+    if result and result.get("status") == "ok":
+        status_movements = {
+            "all_movements": result.get("status_movements", 0),
+        }
+
+    return {
+        "snapshot": snapshot,
+        "result": result,
+        "status_movements": status_movements,
+        "history": history,
+    }
+
+
+# -------------------------------------------------------------------
+# Full-page Inspector (Admin)
+# -------------------------------------------------------------------
+
+@router.get("/inspector", response_class=HTMLResponse)
+def sim_client_inspector_page(
+    request: Request,
+    admin: Any = Depends(authenticated_admin),
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """
+    Full admin inspector page shell.
+    HTMX inside will load partial content into the panel.
+    """
+    context = _build_context(db, result=None)
+    html = render_template("admin_sim_client_inspector.html", context)
+    return HTMLResponse(content=html)
+
+
+# -------------------------------------------------------------------
+# Partial inspector panel for HTMX auto-refresh
+# -------------------------------------------------------------------
+
+@router.get("/inspector-partial", response_class=HTMLResponse)
+def sim_client_inspector_partial(
+    request: Request,
+    admin: Any = Depends(authenticated_admin),
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """
+    Partial panel used for auto-refresh and run-day UI updates.
+    """
+    context = _build_context(db, result=None)
+    html = render_template("admin_sim_client_inspector_partial.html", context)
+    return HTMLResponse(content=html)
+
+
+# -------------------------------------------------------------------
+# Run one simulated day and return updated panel
+# -------------------------------------------------------------------
+
+@router.post("/run-day-inspector", response_class=HTMLResponse)
+def sim_client_run_day_inspector(
+    request: Request,
+    admin: Any = Depends(authenticated_admin),
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """
+    Execute a client simulation day and return the updated inspector panel.
+    """
+    result = simulate_client_day(db)
+    context = _build_context(db, result=result)
+    html = render_template("admin_sim_client_inspector_partial.html", context)
+    return HTMLResponse(content=html)

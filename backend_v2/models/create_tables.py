@@ -1,0 +1,9 @@
+from backend_v2.database import engine, Base
+
+# Import models explicitly so SQLAlchemy knows them
+from backend_v2.models.sim_reports_log import SimReportLog
+from backend_v2.database import Base
+
+print("Creating tables…")
+Base.metadata.create_all(bind=engine)
+print("Done.")

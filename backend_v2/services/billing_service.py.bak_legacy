@@ -1,0 +1,43 @@
+# backend_v2/services/billing_service.py
+
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+import logging
+from typing import Dict, Any
+
+logger = logging.getLogger("the13th.billing")
+
+
+def get_admin_billing_metrics(db: Session) -> Dict[str, Any]:
+    try:
+        active_subs = db.execute(
+            text("SELECT COUNT(*) FROM subscriptions WHERE status = 'active'")
+        ).scalar() or 0
+
+        active_trials = db.execute(
+            text("SELECT COUNT(*) FROM subscriptions WHERE status = 'trialing'")
+        ).scalar() or 0
+
+        total_mrr = db.execute(
+            text("SELECT COALESCE(SUM(price_amount), 0) FROM subscriptions WHERE status='active'")
+        ).scalar() or 0
+
+        invoices_30d = db.execute(
+            text("SELECT COUNT(*) FROM invoices WHERE created_at >= NOW() - INTERVAL '30 days'")
+        ).scalar() or 0
+
+        return {
+            "total_mrr": float(total_mrr),
+            "active_subscriptions": int(active_subs),
+            "active_trials": int(active_trials),
+            "invoices_30d": int(invoices_30d),
+        }
+
+    except Exception as e:
+        logger.error(f"[billing_service] Failed to calculate metrics: {e}")
+        return {
+            "total_mrr": 0,
+            "active_subscriptions": 0,
+            "active_trials": 0,
+            "invoices_30d": 0,
+        }

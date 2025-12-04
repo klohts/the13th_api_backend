@@ -1,0 +1,284 @@
+from __future__ import annotations
+
+import logging
+import os
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
+
+logger = logging.getLogger("the13th.ai_writer_service")
+
+
+@dataclass
+class AIWriterConfig:
+    provider: str = os.getenv("THE13TH_AI_PROVIDER", "stub").lower()
+    openai_model: str = os.getenv("THE13TH_OPENAI_MODEL", "gpt-4.1-mini")
+    gemini_model: str = os.getenv("THE13TH_GEMINI_MODEL", "gemini-1.5-flash")
+    max_tokens: int = int(os.getenv("THE13TH_AI_MAX_TOKENS", "400"))
+
+
+class AIWriterService:
+    """Unified AI writer facade used across THE13TH services.
+
+    Provider priority:
+      - THE13TH_AI_PROVIDER=openai → OpenAI SDK (if available + API key)
+      - THE13TH_AI_PROVIDER=gemini → Gemini SDK (if available + API key)
+      - Otherwise → templated fallback (non-AI, always safe).
+    """
+
+    def __init__(self, config: Optional[AIWriterConfig] = None) -> None:
+        self.config = config or AIWriterConfig()
+        logger.info("AIWriterService initialized with provider=%s", self.config.provider)
+
+    # ------------------------------------------------------------------
+    # PUBLIC API
+    # ------------------------------------------------------------------
+    def generate_reply(
+        self,
+        *,
+        subject: str,
+        body: str,
+        thread_context: Optional[str] = None,
+        persona: str = "default",
+        metadata: Optional[Dict[str, Any]] = None,
+        max_tokens: Optional[int] = None,
+    ) -> str:
+        """Generate a reply for an email or message.
+
+        This is the only method other services should call.
+        """
+        max_tokens = max_tokens or self.config.max_tokens
+        metadata = metadata or {}
+
+        try:
+            if self.config.provider == "openai":
+                return self._generate_with_openai(
+                    subject=subject,
+                    body=body,
+                    thread_context=thread_context,
+                    persona=persona,
+                    metadata=metadata,
+                    max_tokens=max_tokens,
+                )
+            if self.config.provider == "gemini":
+                return self._generate_with_gemini(
+                    subject=subject,
+                    body=body,
+                    thread_context=thread_context,
+                    persona=persona,
+                    metadata=metadata,
+                    max_tokens=max_tokens,
+                )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("AI generation failed, falling back to template: %s", exc)
+
+        # Always safe, deterministic fallback
+        return self._fallback_template(
+            subject=subject,
+            body=body,
+            thread_context=thread_context,
+            persona=persona,
+            metadata=metadata,
+        )
+
+    # ------------------------------------------------------------------
+    # OPENAI BACKEND
+    # ------------------------------------------------------------------
+    def _generate_with_openai(
+        self,
+        *,
+        subject: str,
+        body: str,
+        thread_context: Optional[str],
+        persona: str,
+        metadata: Dict[str, Any],
+        max_tokens: int,
+    ) -> str:
+        try:
+            from openai import OpenAI  # type: ignore[import-untyped]
+        except ImportError:
+            logger.warning("OpenAI SDK not installed. Using fallback template.")
+            return self._fallback_template(
+                subject=subject,
+                body=body,
+                thread_context=thread_context,
+                persona=persona,
+                metadata=metadata,
+            )
+
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            logger.warning("OPENAI_API_KEY missing. Using fallback template.")
+            return self._fallback_template(
+                subject=subject,
+                body=body,
+                thread_context=thread_context,
+                persona=persona,
+                metadata=metadata,
+            )
+
+        client = OpenAI(api_key=api_key)
+
+        system_prompt = (
+            "You are THE13TH's AI email assistant. "
+            "You write concise, professional, and friendly emails for US real-estate teams. "
+            "Always be clear, specific, and actionable. Never hallucinate facts."
+        )
+
+        context_bits = []
+        if thread_context:
+            context_bits.append(f"Thread history:\n{thread_context}")
+        context_bits.append(f"Latest inbound email body:\n{body}")
+        if metadata:
+            context_bits.append(f"Metadata:\n{metadata}")
+
+        user_prompt = (
+            f"Subject: {subject}\n\n"
+            + "\n\n".join(context_bits)
+            + "\n\nWrite the best possible reply email. "
+            "Keep it under 3 short paragraphs unless more detail is clearly needed."
+        )
+
+        logger.info("Calling OpenAI model=%s, max_tokens=%s", self.config.openai_model, max_tokens)
+
+        response = client.responses.create(
+            model=self.config.openai_model,
+            max_output_tokens=max_tokens,
+            input=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+
+        try:
+            # openai==1.x responses API shape
+            message = response.output[0].content[0].text  # type: ignore[index]
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Unexpected OpenAI response shape: %s", exc)
+            return self._fallback_template(
+                subject=subject,
+                body=body,
+                thread_context=thread_context,
+                persona=persona,
+                metadata=metadata,
+            )
+
+        return message.strip()
+
+    # ------------------------------------------------------------------
+    # GEMINI BACKEND
+    # ------------------------------------------------------------------
+    def _generate_with_gemini(
+        self,
+        *,
+        subject: str,
+        body: str,
+        thread_context: Optional[str],
+        persona: str,
+        metadata: Dict[str, Any],
+        max_tokens: int,
+    ) -> str:
+        try:
+            import google.generativeai as genai  # type: ignore[import-untyped]
+        except ImportError:
+            logger.warning("Gemini SDK not installed. Using fallback template.")
+            return self._fallback_template(
+                subject=subject,
+                body=body,
+                thread_context=thread_context,
+                persona=persona,
+                metadata=metadata,
+            )
+
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            logger.warning("GEMINI_API_KEY missing. Using fallback template.")
+            return self._fallback_template(
+                subject=subject,
+                body=body,
+                thread_context=thread_context,
+                persona=persona,
+                metadata=metadata,
+            )
+
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(self.config.gemini_model)
+
+        system_prompt = (
+            "You are THE13TH's AI email assistant for real-estate teams. "
+            "Write concise, warm, and professional replies that move deals forward."
+        )
+
+        context_bits = []
+        if thread_context:
+            context_bits.append(f"Thread history:\n{thread_context}")
+        context_bits.append(f"Latest inbound email body:\n{body}")
+        if metadata:
+            context_bits.append(f"Metadata:\n{metadata}")
+
+        user_prompt = (
+            f"{system_prompt}\n\n"
+            f"Subject: {subject}\n\n"
+            + "\n\n".join(context_bits)
+            + "\n\nWrite the reply email."
+        )
+
+        logger.info("Calling Gemini model=%s", self.config.gemini_model)
+
+        response = model.generate_content(
+            user_prompt,
+            generation_config={
+                "max_output_tokens": max_tokens,
+                "temperature": 0.4,
+            },
+        )
+        text = getattr(response, "text", "") or ""
+        if not text.strip():
+            logger.warning("Empty Gemini response. Falling back to template.")
+            return self._fallback_template(
+                subject=subject,
+                body=body,
+                thread_context=thread_context,
+                persona=persona,
+                metadata=metadata,
+            )
+        return text.strip()
+
+    # ------------------------------------------------------------------
+    # FALLBACK TEMPLATE (NON-AI)
+    # ------------------------------------------------------------------
+    def _fallback_template(
+        self,
+        *,
+        subject: str,
+        body: str,
+        thread_context: Optional[str],
+        persona: str,
+        metadata: Dict[str, Any],
+    ) -> str:
+        logger.info("Using fallback email template (provider=%s).", self.config.provider)
+        preview = body.strip().replace("\n", " ")
+        if len(preview) > 220:
+            preview = preview[:217] + "..."
+
+        lines = [
+            "Hi there,",
+            "",
+            "Thank you for your message. I've reviewed the details below and will follow up shortly with next steps.",
+            "",
+        ]
+
+        if metadata.get("lead_name"):
+            lines[0] = f"Hi {metadata['lead_name']},"
+
+        lines.append(f"Quick summary of what you shared: {preview}")
+        lines.append("")
+        lines.append("I'll come back to you with a clear update or proposal as soon as possible.")
+        lines.append("")
+        lines.append("Best regards,")
+        lines.append(metadata.get("agent_name") or "The THE13TH Team")
+
+        return "\n".join(lines)
+
+
+# Singleton instance used across the app
+ai_writer = AIWriterService()

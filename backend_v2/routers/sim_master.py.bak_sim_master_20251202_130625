@@ -1,0 +1,44 @@
+from __future__ import annotations
+
+import logging
+from typing import Any, Dict
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
+
+from backend_v2.database import get_db
+from backend_v2.services.auth_service import authenticated_admin
+from backend_v2.services.render import render_template
+from backend_v2.services.sim_master_service import build_sim_master_context
+
+logger = logging.getLogger("the13th.sim_master.router")
+
+router = APIRouter(prefix="/admin/sim-master", tags=["Simulation Master"])
+
+
+@router.get("", response_class=HTMLResponse)
+def sim_master_dashboard(
+    request: Request,
+    admin: Any = Depends(authenticated_admin),
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """
+    Top-level Simulation Master view.
+
+    Surfaces Simulation Lab readiness for demos and GTM:
+    - Seeded companies / leads
+    - Burst runs
+    - Message volumes
+    - Persona distribution
+    - Recent activity
+    """
+    context: Dict[str, Any] = build_sim_master_context(db)
+    context.update(
+        {
+            "request": request,
+            "admin": admin,
+            "page_title": "Simulation Master Dashboard",
+        }
+    )
+    return render_template("admin_sim_master.html", context)

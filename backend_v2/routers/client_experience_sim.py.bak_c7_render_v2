@@ -1,0 +1,211 @@
+# backend_v2/routers/client_experience_sim.py
+
+from __future__ import annotations
+
+import logging
+from typing import Any, Dict
+
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
+
+from backend_v2.database import get_db
+from backend_v2.services.auth_service import authenticated_admin
+from backend_v2.services.render import render_template
+from backend_v2.sim_client_engine import run_client_simulation, get_available_personas
+
+logger = logging.getLogger("the13th.client_experience_sim")
+
+
+def compute_client_experience_summary(simulation: Dict | None) -> Dict:
+    """
+    Derive a compact summary of the simulated client experience that can be
+    rendered as an AI Agent Summary panel.
+    """
+    from math import ceil
+
+    summary: Dict[str, Dict] = {
+        "lead_profile": {
+            "label": "Not enough data yet",
+            "summary": "Run a 30-day simulation to profile this lead.",
+            "rhythm": "—",
+        },
+        "assistant_pattern": {
+            "label": "No pattern detected yet",
+            "summary": "Assistant behaviour will be summarised after at least a few messages.",
+        },
+        "journey": {
+            "start_stage": "—",
+            "end_stage": "—",
+            "path": "",
+            "days": 0,
+        },
+        "metrics": {
+            "convert_prob": 0.0,
+            "dropoff_prob": 0.0,
+            "intensity_score": 0.0,
+        },
+    }
+
+    if not simulation or not isinstance(simulation, dict):
+        return summary
+
+    events = simulation.get("events") or []
+    if not isinstance(events, list) or not events:
+        return summary
+
+    # Basic day + sender breakdown
+    days_seen = set()
+    client_msgs = 0
+    assistant_msgs = 0
+    stages: list[str] = []
+
+    for ev in events:
+        if not isinstance(ev, dict):
+            continue
+        day = ev.get("day") or ev.get("day_index") or ev.get("d")
+        if day is not None:
+            days_seen.add(day)
+
+        stage = ev.get("stage") or ev.get("lead_stage") or ""
+        if stage and (not stages or stages[-1] != stage):
+            stages.append(str(stage))
+
+        sender_raw = (ev.get("sender") or ev.get("from") or "").lower()
+        if sender_raw in {"lead", "client", "buyer", "prospect"}:
+            client_msgs += 1
+        elif sender_raw in {"assistant", "agent", "ai", "system"}:
+            assistant_msgs += 1
+
+    total_msgs = client_msgs + assistant_msgs
+    days_count = max(len(days_seen), 1)
+
+    # Lead profile
+    if client_msgs == 0:
+        lead_label = "Silent / unresponsive"
+        rhythm = "No replies observed yet."
+    elif client_msgs <= ceil(days_count * 0.3):
+        lead_label = "Low-frequency responder"
+        rhythm = "Occasional replies with long gaps."
+    elif client_msgs <= ceil(days_count * 0.7):
+        lead_label = "Steady engager"
+        rhythm = "Regular replies across the journey."
+    else:
+        lead_label = "High-intent, high-engagement"
+        rhythm = "Very active throughout the journey."
+
+    summary["lead_profile"]["label"] = lead_label
+    summary["lead_profile"]["rhythm"] = rhythm
+    summary["lead_profile"]["summary"] = (
+        f"{client_msgs} client messages over {days_count} day(s)."
+    )
+
+    # Assistant pattern
+    if assistant_msgs == 0:
+        assist_label = "Assistant has not engaged yet"
+        assist_summary = "No outbound messages from the assistant were recorded."
+    else:
+        ratio = assistant_msgs / max(client_msgs, 1)
+        if ratio < 0.8:
+            assist_label = "Conservative follow-up"
+            assist_summary = "Assistant replied selectively, keeping touchpoints light."
+        elif ratio <= 1.5:
+            assist_label = "Balanced follow-up"
+            assist_summary = "Assistant maintained a healthy reply rhythm."
+        else:
+            assist_label = "High-touch assistant"
+            assist_summary = "Assistant followed up aggressively with dense touchpoints."
+
+    summary["assistant_pattern"]["label"] = assist_label
+    summary["assistant_pattern"]["summary"] = (
+        assist_summary + f" ({assistant_msgs} messages from assistant.)"
+    )
+
+    # Journey
+    if stages:
+        summary["journey"]["start_stage"] = stages[0]
+        summary["journey"]["end_stage"] = stages[-1]
+        if len(stages) > 1:
+            summary["journey"]["path"] = " → ".join(stages)
+        else:
+            summary["journey"]["path"] = stages[0]
+    summary["journey"]["days"] = days_count
+
+    # Simple probability heuristics
+    end_stage = summary["journey"]["end_stage"].lower()
+    high_intent_keywords = ["high intent", "hot", "engaged", "active", "under contract"]
+    converted_keywords = ["won", "closed won"]
+
+    convert_prob = 0.1
+    drop_prob = 0.3
+
+    if any(k in end_stage for k in converted_keywords):
+        convert_prob = 0.95
+        drop_prob = 0.02
+    elif any(k in end_stage for k in high_intent_keywords):
+        convert_prob = 0.75
+        drop_prob = 0.15
+    elif "cold" in end_stage or "lost" in end_stage:
+        convert_prob = 0.15
+        drop_prob = 0.7
+    else:
+        # neutral stage, weight by activity
+        if client_msgs >= days_count:
+            convert_prob = 0.55
+            drop_prob = 0.25
+        elif client_msgs == 0:
+            convert_prob = 0.05
+            drop_prob = 0.8
+        else:
+            convert_prob = 0.35
+            drop_prob = 0.4
+
+    intensity = min(1.0, total_msgs / float(days_count * 4))
+
+    summary["metrics"]["convert_prob"] = round(convert_prob * 100, 1)
+    summary["metrics"]["dropoff_prob"] = round(drop_prob * 100, 1)
+    summary["metrics"]["intensity_score"] = round(intensity * 100, 1)
+
+    return summary
+
+router = APIRouter(
+    prefix="/admin/sim-client/experience",
+    tags=["Client Experience Simulation"],
+)
+
+
+@router.get("", response_class=HTMLResponse)
+def client_experience_page(
+    request: Request,
+    persona: str = Query("hot_lead", description="Persona key to simulate"),
+    days: int = Query(30, ge=7, le=60, description="Number of days to simulate"),
+    db: Session = Depends(get_db),
+    admin: Any = Depends(authenticated_admin),
+) -> HTMLResponse:
+    """
+    Render the Client Experience Simulation page.
+    """
+    try:
+        personas = get_available_personas()
+        simulation = run_client_simulation(days=days, persona_key=persona)
+    except Exception as exc:
+        logger.exception("Error generating client simulation: %s", exc)
+        personas = get_available_personas()
+        simulation = None
+
+    summary = compute_client_experience_summary(simulation)
+
+    context = {
+        "request": request,       # Jinja2 needs this inside context, not as render param
+        "personas": personas,
+        "simulation": simulation,
+        "summary": summary,
+    }
+
+    context["graphs"] = (simulation or {}).get("graphs")
+
+    return render_template(
+        "admin_sim_client_experience.html",
+        context=context
+    )
+

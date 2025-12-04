@@ -1,0 +1,1156 @@
+{% extends "base_admin_sim.html" %}
+
+{% block title %}Client Journey Studio — THE13TH{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="/static/css/charts.css" />
+
+<style>
+  /* ============================================
+   * THE13TH — Global Cinematic Client Journey
+   * ============================================ */
+
+  .hero-wrap {
+    border-radius: 28px;
+    padding: 42px 48px;
+    background: radial-gradient(circle at top left,
+      rgba(168,85,247,0.35),
+      rgba(15,23,42,0.92) 55%);
+    box-shadow: 0 24px 72px rgba(0,0,0,0.65);
+    margin-bottom: 32px;
+  }
+
+  .form-grid {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+
+  .input-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+  }
+
+  .input-card label {
+    font-size: 13px;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  .input-card select,
+  .input-card input {
+    background: rgba(15,23,42,0.55);
+    border: 1px solid rgba(148,163,184,0.35);
+    border-radius: 10px;
+    padding: 11px 13px;
+    font-size: 15px;
+    color: #e5e7eb;
+    outline: none;
+  }
+
+  .input-card select:focus,
+  .input-card input:focus {
+    border-color: rgba(129,140,248,0.8);
+    box-shadow: 0 0 0 1px rgba(129,140,248,0.7);
+  }
+
+  .btn-primary {
+    background: linear-gradient(to right, #7c3aed, #a855f7);
+    color: #f9fafb;
+    font-weight: 600;
+    border-radius: 999px;
+    padding: 11px 22px;
+    font-size: 15px;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 12px 32px rgba(15,23,42,0.6);
+    cursor: pointer;
+    transition:
+      background 0.25s ease,
+      box-shadow 0.25s ease,
+      transform 0.18s ease;
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(to right, #8b5cf6, #c4b5fd);
+    box-shadow: 0 18px 40px rgba(15,23,42,0.75);
+    transform: translateY(-1px);
+  }
+
+  .btn-subtle {
+    background: rgba(15,23,42,0.85);
+    color: #e5e7eb;
+    font-weight: 500;
+    border-radius: 999px;
+    padding: 9px 18px;
+    font-size: 14px;
+    border: 1px solid rgba(148,163,184,0.55);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition:
+      background 0.25s ease,
+      border-color 0.25s ease,
+      transform 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+
+  .btn-subtle:hover {
+    background: rgba(30,64,175,0.35);
+    border-color: rgba(129,140,248,0.9);
+    box-shadow: 0 10px 26px rgba(15,23,42,0.7);
+    transform: translateY(-1px);
+  }
+
+  .kpi-strip {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    margin-bottom: 40px;
+  }
+
+  .kpi-card {
+    padding: 20px 22px;
+    border-radius: 18px;
+    background: rgba(15,23,42,0.9);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.55);
+  }
+
+  .kpi-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #9ca3af;
+    letter-spacing: 0.16em;
+  }
+
+  .kpi-value {
+    font-size: 31px;
+    margin-top: 6px;
+    font-weight: 600;
+    color: #f9fafb;
+  }
+
+  .kpi-sub {
+    font-size: 14px;
+    color: #a5b4fc;
+    margin-top: 2px;
+  }
+
+  .cj-layout-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1.9fr) minmax(0, 1.4fr);
+    gap: 22px;
+    margin-bottom: 26px;
+  }
+
+  .cj-secondary-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.35fr);
+    gap: 22px;
+    margin-bottom: 26px;
+  }
+
+  .cj-footer-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.4fr);
+    gap: 18px;
+    margin-top: 10px;
+  }
+
+  .cj-section-title {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: #9ca3af;
+    margin-bottom: 6px;
+  }
+
+  .cj-section-subtitle {
+    font-size: 14px;
+    color: #e5e7eb;
+    opacity: 0.9;
+    margin-bottom: 14px;
+  }
+
+  .persona-pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .persona-pill {
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(148,163,184,0.5);
+    background: rgba(15,23,42,0.85);
+    color: #e5e7eb;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .persona-pill span.dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #22c55e;
+  }
+
+  .cj-story-grid {
+    display: grid;
+    gap: 12px;
+  }
+
+  .story-row {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .story-index {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    border: 1px solid rgba(148,163,184,0.55);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #e5e7eb;
+    background: rgba(15,23,42,0.85);
+  }
+
+  .story-body-title {
+    font-size: 14px;
+    color: #e5e7eb;
+    font-weight: 500;
+  }
+
+  .story-body-copy {
+    font-size: 13px;
+    color: #9ca3af;
+    margin-top: 2px;
+  }
+
+  .story-meta {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #a5b4fc;
+  }
+
+  .outcome-tag {
+    font-size: 12px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .outcome-tag span.dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+  }
+
+  .outcome-tag--won {
+    background: rgba(22,163,74,0.18);
+    color: #bbf7d0;
+    border: 1px solid rgba(34,197,94,0.9);
+  }
+
+  .outcome-tag--lost {
+    background: rgba(185,28,28,0.18);
+    color: #fecaca;
+    border: 1px solid rgba(248,113,113,0.9);
+  }
+
+  .outcome-tag--open {
+    background: rgba(30,64,175,0.2);
+    color: #bfdbfe;
+    border: 1px solid rgba(59,130,246,0.9);
+  }
+
+  .outcome-headline {
+    font-size: 21px;
+    font-weight: 600;
+    color: #f9fafb;
+    margin-top: 6px;
+  }
+
+  .outcome-copy {
+    font-size: 14px;
+    color: #9ca3af;
+    margin-top: 4px;
+  }
+
+  .persona-profile {
+    font-size: 14px;
+    color: #e5e7eb;
+  }
+
+  .persona-profile dt {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: #9ca3af;
+    margin-top: 10px;
+  }
+
+  .persona-profile dd {
+    margin: 2px 0 0;
+    font-size: 14px;
+  }
+
+  .journey-chart-shell {
+    height: 260px;
+    border-radius: 16px;
+    background: radial-gradient(circle at top left,
+      rgba(129,140,248,0.24),
+      rgba(15,23,42,0.95) 60%);
+    border: 1px solid rgba(148,163,184,0.35);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .journey-chart-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: #a5b4fc;
+    opacity: 0.9;
+    text-align: center;
+    padding: 0 24px;
+  }
+
+  .stage-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .stage-pill {
+    font-size: 12px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(15,23,42,0.9);
+    border: 1px solid rgba(148,163,184,0.4);
+    color: #e5e7eb;
+  }
+
+  .timeline {
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .timeline-item {
+    border-left: 1px solid rgba(148,163,184,0.35);
+    padding-left: 10px;
+    margin-left: 6px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+
+  .timeline-item::before {
+    content: "";
+    position: absolute;
+    left: -5px;
+    top: 4px;
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: #a855f7;
+    box-shadow: 0 0 10px rgba(168,85,247,0.9);
+  }
+
+  .timeline-label {
+    font-size: 12px;
+    color: #9ca3af;
+  }
+
+  .timeline-headline {
+    font-size: 14px;
+    color: #e5e7eb;
+    margin-top: 2px;
+  }
+
+  .timeline-meta {
+    font-size: 12px;
+    color: #a5b4fc;
+    margin-top: 2px;
+  }
+
+  .email-thread {
+    margin-top: 6px;
+    border-radius: 10px;
+    background: rgba(15,23,42,0.9);
+    border: 1px solid rgba(148,163,184,0.35);
+    padding: 8px 10px;
+    font-size: 13px;
+    color: #e5e7eb;
+  }
+
+  .email-role {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #9ca3af;
+  }
+
+  .email-body {
+    margin-top: 3px;
+    white-space: pre-line;
+  }
+
+  .list-compact {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 13px;
+    color: #e5e7eb;
+  }
+
+  .list-compact li {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px dashed rgba(148,163,184,0.3);
+  }
+
+  .list-compact li span.label {
+    color: #9ca3af;
+  }
+
+  .list-compact li span.value {
+    color: #e5e7eb;
+  }
+
+  .demo-note {
+    font-size: 13px;
+    color: #9ca3af;
+    margin-top: 6px;
+  }
+
+  .btn-replay-primary {
+    background: #faf5ff;
+    color: #4c1d95;
+    font-weight: 700;
+    padding: 11px 22px;
+    border-radius: 12px;
+    border: 1px solid rgba(76, 29, 149, 0.2);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.22);
+    transition: background 0.25s ease, box-shadow 0.25s ease, transform 0.18s ease;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .btn-replay-primary:hover {
+    background: #f3e8ff;
+    box-shadow: 0 10px 26px rgba(0,0,0,0.30);
+    transform: translateY(-1px);
+  }
+
+  #replay-status {
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #d9d6ff;
+  }
+
+  #replay-progress-wrapper {
+    width: 100%;
+    height: 6px;
+    background: rgba(255,255,255,0.10);
+    border-radius: 4px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+
+  #replay-progress-bar {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(to right, #a855f7, #7c3aed);
+    transition: width 0.15s linear;
+  }
+
+  .replay-highlight {
+    background: rgba(168,85,247,0.20) !important;
+    border-left: 3px solid #a855f7 !important;
+  }
+
+  .fade-in-up {
+    opacity: 0;
+    transform: translateY(12px);
+    transition:
+      opacity 0.65s ease-out,
+      transform 0.65s ease-out;
+  }
+
+  .fade-in-up.revealed {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .fade-in-stagger:nth-child(1) { transition-delay: 0.05s; }
+  .fade-in-stagger:nth-child(2) { transition-delay: 0.15s; }
+  .fade-in-stagger:nth-child(3) { transition-delay: 0.25s; }
+  .fade-in-stagger:nth-child(4) { transition-delay: 0.35s; }
+
+  .hover-pulse {
+    transition:
+      transform 0.25s ease-out,
+      box-shadow 0.25s ease-out;
+  }
+
+  .hover-pulse:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.45);
+  }
+
+  .hero-wrap.motion-ambient {
+    animation: heroGradientShift 16s ease-in-out infinite alternate;
+  }
+
+  @keyframes heroGradientShift {
+    0% {
+      background: radial-gradient(circle at top left,
+        rgba(168,85,247,0.35),
+        rgba(15,23,42,0.92) 55%);
+    }
+    100% {
+      background: radial-gradient(circle at center right,
+        rgba(99,102,241,0.22),
+        rgba(13,27,42,0.95) 60%);
+    }
+  }
+
+  .fade-late {
+  opacity: 1;               /* was 0 */
+  transform: translateY(0); /* was 18px */
+  transition:
+    opacity 0.8s ease-out,
+    transform 0.8s ease-out;
+  transition-delay: 0.25s;
+}
+
+.fade-late.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+
+  @media (max-width: 1024px) {
+    .hero-wrap {
+      padding: 28px 20px;
+    }
+    .cj-layout-main,
+    .cj-secondary-grid,
+    .cj-footer-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .form-grid {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block page_title %}
+Client Journey Simulation — Full Cinematic Pass
+{% endblock %}
+
+{% block page_subtitle %}
+See how one lead travels through your pipeline — persona, replies, delays, nudges, and final outcome — rendered in a cinematic, premium experience.
+{% endblock %}
+
+{% block content %}
+
+<div class="hero-wrap motion-ambient fade-in-up">
+  <form action="/admin/client-experience" method="get">
+    <div class="form-grid">
+      <div class="input-card">
+        <label>Persona</label>
+        <select class="hover-pulse" name="persona">
+          <option value="hot_lead" {% if persona == 'hot_lead' %}selected{% endif %}>Hot Buyer</option>
+          <option value="warm_lead" {% if persona == 'warm_lead' %}selected{% endif %}>Warm Buyer</option>
+          <option value="cold_lead" {% if persona == 'cold_lead' %}selected{% endif %}>Cold Buyer</option>
+          <option value="research_heavy" {% if persona == 'research_heavy' %}selected{% endif %}>Research-heavy</option>
+          <option value="ghosting_lead" {% if persona == 'ghosting_lead' %}selected{% endif %}>Ghosting lead</option>
+        </select>
+      </div>
+
+      <div class="input-card">
+        <label>Days to Simulate</label>
+        <input
+          type="number"
+          name="days"
+          min="3"
+          max="90"
+          value="{{ simulation_days|default(30) }}"
+        />
+      </div>
+
+      <button
+        type="submit"
+        class="btn-primary hover-pulse"
+        style="margin-top:4px;"
+      >
+        Run Simulation
+      </button>
+    </div>
+  </form>
+</div>
+
+<div class="kpi-strip fade-in-up" style="transition-delay:100ms;">
+  <div class="kpi-card fade-in-up fade-in-stagger hover-pulse">
+    <div class="kpi-label">Conversion Likelihood</div>
+    <div class="kpi-value">
+      {{ summary.conversion_likelihood|default("—") }}%
+    </div>
+    <div class="kpi-sub">
+      Probability of closing based on persona and journey data
+    </div>
+  </div>
+
+  <div class="kpi-card fade-in-up fade-in-stagger hover-pulse">
+    <div class="kpi-label">Drop-Off Risk</div>
+    <div class="kpi-value">
+      {{ summary.dropoff_risk|default("—") }}%
+    </div>
+    <div class="kpi-sub">
+      Likelihood of losing this lead during the simulation window
+    </div>
+  </div>
+
+  <div class="kpi-card fade-in-up fade-in-stagger hover-pulse">
+    <div class="kpi-label">Engagement Intensity</div>
+    <div class="kpi-value">
+      {{ summary.engagement_intensity|default("—") }}/100
+    </div>
+    <div class="kpi-sub">
+      How consistently the conversation stays alive
+    </div>
+  </div>
+
+  <div class="kpi-card fade-in-up fade-in-stagger hover-pulse">
+    <div class="kpi-label">Pipeline Depth</div>
+    <div class="kpi-value">
+      {{ summary.pipeline_depth_label|default("—") }}
+    </div>
+    <div class="kpi-sub">
+      Where the lead finishes at the end of the window
+    </div>
+  </div>
+</div>
+
+<div class="cj-layout-main fade-in-up" style="transition-delay:160ms;">
+  <section class="card-soft" style="padding:20px 22px;">
+    <div class="cj-section-title">Instant storyboard</div>
+    <div class="cj-section-subtitle">
+      A compressed narrative of this lead’s journey — from first click to final outcome.
+    </div>
+
+    <div class="persona-pill-row">
+      <span class="persona-pill">
+        <span class="dot"></span>
+        Persona · {{ persona_label|default("Lead") }}
+      </span>
+      <span class="persona-pill">
+        Reply pattern · {{ summary.reply_pattern_label|default("Fast, consistent follow-up") }}
+      </span>
+      <span class="persona-pill">
+        Risk profile · {{ summary.risk_profile_label|default("Medium risk, high upside") }}
+      </span>
+    </div>
+
+    <div class="fade-in-up cj-story-grid" style="margin-top:18px;">
+      <div class="fade-in-up story-row">
+        <div class="fade-in-up story-index">1</div>
+        <div>
+          <div class="fade-in-up story-body-title">Lead discovers your brand</div>
+          <div class="fade-in-up story-body-copy">
+            {{ summary.story_step_1|default("They click on a listing, join your buyer list, and signal strong purchase intent within the first 24 hours.") }}
+          </div>
+          <div class="fade-in-up story-meta">
+            Day 0–1 · Intent captured · Lead scored as {{ summary.initial_score|default("82") }}/100
+          </div>
+        </div>
+      </div>
+
+      <div class="fade-in-up story-row">
+        <div class="fade-in-up story-index">2</div>
+        <div>
+          <div class="fade-in-up story-body-title">Your assistant acknowledges and qualifies</div>
+          <div class="fade-in-up story-body-copy">
+            {{ summary.story_step_2|default("THE13TH responds quickly, sets expectations, and narrows down what they’re really looking for — budget, timing, neighborhood, and constraints.") }}
+          </div>
+          <div class="fade-in-up story-meta">
+            First reply · Median reply time:
+            {{ summary.median_reply_time_label|default("17 minutes") }}
+          </div>
+        </div>
+      </div>
+
+      <div class="fade-in-up story-row">
+        <div class="fade-in-up story-index">3</div>
+        <div>
+          <div class="fade-in-up story-body-title">Momentum builds or drops</div>
+          <div class="fade-in-up story-body-copy">
+            {{ summary.story_step_3|default("As days progress, the model keeps nudging, answering questions, and recovering from slow replies to prevent the lead from going cold.") }}
+          </div>
+          <div class="fade-in-up story-meta">
+            Engagement intensity:
+            {{ summary.engagement_intensity_label|default("High, with 4–6 touchpoints per week") }}
+          </div>
+        </div>
+      </div>
+
+      <div class="fade-in-up story-row">
+        <div class="fade-in-up story-index">4</div>
+        <div>
+          <div class="fade-in-up story-body-title">Outcome and learning loop</div>
+          <div class="fade-in-up story-body-copy">
+            {{ summary.story_step_4|default("By the end of the window, the system either wins the client, cleanly closes the loop, or disqualifies them — and feeds that pattern back into your forecasting.") }}
+          </div>
+          <div class="fade-in-up story-meta">
+            Outcome: {{ summary.outcome_label|default("Likely to convert") }} ·
+            Feedback written back to pipeline model
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="card-soft" style="padding:20px 22px;">
+    <div class="cj-section-title">Outcome snapshot</div>
+
+    {% set outcome_class = 'outcome-tag--open' %}
+    {% if summary.outcome_raw == 'won' %}
+      {% set outcome_class = 'outcome-tag--won' %}
+    {% elif summary.outcome_raw == 'lost' %}
+      {% set outcome_class = 'outcome-tag--lost' %}
+    {% endif %}
+
+    <span class="outcome-tag {{ outcome_class }}">
+      <span class="dot"></span>
+      {{ summary.outcome_label|default("Likely to convert") }}
+    </span>
+
+    <div class="outcome-headline">
+      {{ summary.outcome_headline|default("This lead is on track to close if you maintain current reply patterns.") }}
+    </div>
+
+    <p class="outcome-copy">
+      {{ summary.outcome_copy|default("Based on timing, tone, and engagement across the simulation, THE13TH projects a strong probability that this client will either buy or sign an agreement within the next 14–30 days.") }}
+    </p>
+
+    <dl class="persona-profile" style="margin-top:14px;">
+      <dt>Lead intent</dt>
+      <dd>{{ summary.intent_label|default("Actively shopping, ready to move when the right property appears.") }}</dd>
+
+      <dt>Sensitivity to delay</dt>
+      <dd>{{ summary.delay_sensitivity_label|default("High — slow replies dramatically increase drop-off risk.") }}</dd>
+
+      <dt>Preferred communication pattern</dt>
+      <dd>{{ summary.channel_mix_label|default("Prefers fast email first, then moves to phone or video.") }}</dd>
+
+      <dt>Key risk</dt>
+      <dd>{{ summary.key_risk_label|default("If you disappear for 48–72 hours at a time, they will quietly move on.") }}</dd>
+    </dl>
+
+    <div style="margin-top:18px;">
+      <button type="button" class="btn-subtle hover-pulse">
+        Use this journey in a live demo
+      </button>
+      <p class="demo-note">
+        When you screen-share with a brokerage, start with this panel:
+        it instantly explains what’s happening without needing jargon.
+      </p>
+    </div>
+  </aside>
+</div>
+
+<div class="cj-secondary-grid fade-in-up" style="transition-delay:220ms;">
+
+  <section class="card" style="padding:18px 18px 16px;">
+    <div class="cj-section-title">Journey graph</div>
+    <div class="cj-section-subtitle">
+      Each dot is a touchpoint: replies, nudges, questions, and key decision moments.
+    </div>
+
+    <div class="journey-chart-shell">
+      <canvas id="journeyChart" style="width:100%; height:100%; display:block;"></canvas>
+
+      <div class="journey-chart-placeholder">
+        {% if journey_points %}
+          The journey curve is rendering above. Every point reflects a touchpoint this lead experienced.
+        {% else %}
+          Waiting for simulation data. Run a persona above to see the journey curve and key decision points.
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="stage-pills">
+      {% for stage_label in journey_stage_labels or [] %}
+        <span class="stage-pill">{{ stage_label }}</span>
+      {% endfor %}
+      {% if not journey_stage_labels %}
+        <span class="stage-pill">New inquiry</span>
+        <span class="stage-pill">Qualified</span>
+        <span class="stage-pill">Active search</span>
+        <span class="stage-pill">Offer / Negotiation</span>
+        <span class="stage-pill">Won / Closed</span>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- TIMELINE + EMAIL THREADS -->
+  <section class="card-soft" style="padding:18px 18px 16px;">
+    <div class="cj-section-title">Conversation timeline</div>
+    <div class="cj-section-subtitle">
+      A readable timeline of the back-and-forth between your assistant and the client.
+    </div>
+
+    <!-- DEBUG: show how many events Jinja sees -->
+    <div style="font-size:11px; color:#a5b4fc; margin-bottom:6px;">
+      Events in context: {{ timeline_events|length|default(0) }}
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <button
+        id="replay-button"
+        type="button"
+        class="btn-replay-primary hover-pulse"
+      >
+        Replay this journey
+      </button>
+      <div id="replay-status">Ready to replay this simulated journey.</div>
+
+      <div id="replay-progress-wrapper">
+        <div id="replay-progress-bar"></div>
+      </div>
+    </div>
+
+
+
+
+       <div id="timelineContainer" class="fade-late timeline">
+      <article class="timeline-item" style="background:rgba(15,23,42,0.95); padding:10px 12px; border-radius:10px; margin-bottom:10px;">
+        <div class="fade-late timeline-label">
+          Loading conversation timeline…
+        </div>
+        <div class="fade-late timeline-meta">
+          If this message persists, timeline_events did not render on the client.
+        </div>
+      </article>
+    </div>
+
+
+
+
+
+
+  </section>
+
+</div>
+
+<div class="cj-footer-grid fade-in-up" style="transition-delay:260ms;">
+  <section class="card-soft" style="padding:18px 18px 16px;">
+    <div class="cj-section-title">Email intelligence</div>
+    <div class="cj-section-subtitle">
+      How the assistant actually sounds — tone, pacing, and call-to-action discipline.
+    </div>
+
+    {% if email_threads %}
+      <div class="fade-late timeline" style="max-height: 240px;">
+        {% for thread in email_threads %}
+          <article class="timeline-item" style="margin-bottom: 12px;">
+            <div class="fade-late timeline-label">
+              Thread {{ loop.index }} · {{ thread.channel_label|default("Email") }}
+            </div>
+            <div class="fade-late timeline-headline">
+              {{ thread.subject|default("Follow-up on your home search") }}
+            </div>
+            <div class="fade-late timeline-meta">
+              {{ thread.summary|default("Short summary of how this email nudged the lead forward.") }}
+            </div>
+            <div class="email-thread">
+              <div class="email-role">
+                Assistant → Client
+              </div>
+              <div class="email-body">
+                {{ thread.preview|default("Here’s how your assistant would phrase a follow-up — human, specific, and always moving the deal forward.") }}
+              </div>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="demo-note" style="margin-top: 4px;">
+        When connected to your real inbox, this section shows real AI-written replies and how leads respond.
+        In the demo, it’s driven by simulated threads for this persona.
+      </p>
+    {% endif %}
+  </section>
+
+  <section class="card-muted" style="padding:18px 18px 16px;">
+    <div class="cj-section-title">Impact for your brokerage</div>
+    <div class="cj-section-subtitle">
+      Use this panel as your talk track when walking a client through THE13TH.
+    </div>
+
+    <ul class="list-compact">
+      <li>
+        <span class="label">Leads saved from going cold</span>
+        <span class="value">
+          {{ summary.saved_leads_label|default("2–4 per 100 leads") }}
+        </span>
+      </li>
+      <li>
+        <span class="label">Average response time</span>
+        <span class="value">
+          {{ summary.avg_reply_time_label|default("Under 20 minutes") }}
+        </span>
+      </li>
+      <li>
+        <span class="label">Extra deals per month</span>
+        <span class="value">
+          {{ summary.extra_deals_label|default("+1–3 per team") }}
+        </span>
+      </li>
+      <li>
+        <span class="label">Forecast accuracy</span>
+        <span class="value">
+          {{ summary.forecast_accuracy_label|default("Within 8–12% of reality") }}
+        </span>
+      </li>
+    </ul>
+
+    <div style="margin-top:14px;">
+      <button type="button" class="btn-primary hover-pulse">
+        Save this view as a demo preset
+      </button>
+      <p class="demo-note">
+        In your go-to-market motion, you might keep a few “hero journeys” saved here:
+        one hot buyer, one slow-moving seller, one investor. This page then becomes
+        your default live demo surface.
+      </p>
+    </div>
+  </section>
+</div>
+
+{% endblock %}
+
+{% block extra_body %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  // ---------- Build timeline from JSON ----------
+  const rawTimelineEvents = {{ timeline_events | default([]) | tojson }};
+  const timelineContainer = document.getElementById("timelineContainer");
+
+  let steps = [];
+
+  if (timelineContainer) {
+    const events = Array.isArray(rawTimelineEvents) ? rawTimelineEvents : [];
+
+    if (events.length > 0) {
+      // Clear placeholder
+      timelineContainer.innerHTML = "";
+
+      events.forEach((item, index) => {
+        const article = document.createElement("article");
+        article.className = "timeline-item";
+        article.style.background = "rgba(15,23,42,0.95)";
+        article.style.padding = "10px 12px";
+        article.style.borderRadius = "10px";
+        article.style.marginBottom = "10px";
+
+        const label = document.createElement("div");
+        label.className = "fade-late timeline-label";
+        const dayLabel = item.day_label ?? item.day ?? index;
+        const eventType =
+          item.event_type_label ??
+          (item.event_type
+            ? String(item.event_type).charAt(0).toUpperCase() + String(item.event_type).slice(1)
+            : "Touchpoint");
+        label.textContent = `Day ${dayLabel} · ${eventType}`;
+
+        const headline = document.createElement("div");
+        headline.className = "fade-late timeline-headline";
+        headline.textContent = item.headline || "Message exchanged";
+
+        const meta = document.createElement("div");
+        meta.className = "fade-late timeline-meta";
+        meta.textContent =
+          item.meta || "Reply time, channel, and impact on score.";
+
+        article.appendChild(label);
+        article.appendChild(headline);
+        article.appendChild(meta);
+
+        if (item.email) {
+          const emailWrapper = document.createElement("div");
+          emailWrapper.className = "email-thread";
+          emailWrapper.style.marginTop = "6px";
+
+          const role = document.createElement("div");
+          role.className = "email-role";
+          role.textContent =
+            item.email.role_label || "Assistant \u2192 Client";
+
+          const body = document.createElement("div");
+          body.className = "email-body";
+          body.textContent =
+            item.email.preview ||
+            item.email.body ||
+            "Generated email content preview goes here.";
+
+          emailWrapper.appendChild(role);
+          emailWrapper.appendChild(body);
+          article.appendChild(emailWrapper);
+        }
+
+        timelineContainer.appendChild(article);
+      });
+    }
+
+    // After building DOM, collect all steps for replay
+    steps = Array.from(timelineContainer.querySelectorAll(".timeline-item"));
+
+    // 🔑 Make all fade-late elements in the timeline visible
+    const fadeEls = timelineContainer.querySelectorAll(".fade-late");
+    fadeEls.forEach((el) => el.classList.add("revealed"));
+  }
+
+  // ---------- Replay Engine ----------
+  const btn = document.getElementById("replay-button");
+  const statusEl = document.getElementById("replay-status");
+  const bar = document.getElementById("replay-progress-bar");
+
+  if (btn && statusEl && bar && steps.length > 0) {
+    btn.addEventListener("click", () => {
+      steps.forEach((s) => s.classList.remove("replay-highlight"));
+      statusEl.textContent = "Replaying journey…";
+      bar.style.width = "0%";
+
+      const total = steps.length;
+      const duration = 5000; // 5 seconds per full journey
+      const interval = duration / total;
+      let i = 0;
+
+      const timer = setInterval(() => {
+        if (i >= total) {
+          clearInterval(timer);
+          statusEl.textContent = "Replay complete.";
+          bar.style.width = "100%";
+          return;
+        }
+
+        const step = steps[i];
+        if (step) {
+          step.classList.add("replay-highlight");
+          step.scrollIntoView({ behavior: "smooth", block: "center" });
+          bar.style.width = (((i + 1) / total) * 100) + "%";
+        }
+        i += 1;
+      }, interval);
+    });
+  } else {
+    console.debug(
+      "THE13TH client-experience: replay disabled; steps:",
+      steps.length
+    );
+  }
+
+  // ---------- Journey Graph (Chart.js) ----------
+  const journeyData = {{ journey_points | default([]) | tojson }};
+  const canvas = document.getElementById("journeyChart");
+
+  if (!canvas) {
+    console.debug(
+      "THE13TH client-experience: no #journeyChart canvas found; skipping chart render."
+    );
+    return;
+  }
+
+  if (!Array.isArray(journeyData) || journeyData.length === 0) {
+    console.debug(
+      "THE13TH client-experience: no journey_points data; skipping chart render."
+    );
+    return;
+  }
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    console.debug(
+      "THE13TH client-experience: unable to get 2D context; skipping chart render."
+    );
+    return;
+  }
+
+  const labels = journeyData.map((p) => p.x);
+  const data = journeyData.map((p) => p.y);
+
+  // eslint-disable-next-line no-undef
+  new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Journey intensity",
+          data,
+          borderWidth: 2,
+          tension: 0.35,
+          pointRadius: 3,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+      },
+      scales: {
+        x: {
+          ticks: { color: "#9ca3af" },
+          grid: { color: "rgba(148,163,184,0.16)" },
+        },
+        y: {
+          ticks: { color: "#9ca3af" },
+          grid: { color: "rgba(148,163,184,0.16)" },
+        },
+      },
+    },
+  });
+});
+</script>
+
+
+{% endblock %}

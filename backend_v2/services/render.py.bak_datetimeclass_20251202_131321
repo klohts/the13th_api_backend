@@ -1,0 +1,30 @@
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from fastapi.templating import Jinja2Templates
+import datetime
+from fastapi import Request
+
+logger = logging.getLogger("the13th.render")
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+TEMPLATE_DIR = BASE_DIR / "templates"
+
+templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
+
+def render_template(request: Request, name: str, **context):
+    """
+    Unified Jinja renderer for THE13TH.
+    Must always pass request first.
+
+    Usage:
+        return render_template(request, "file.html", key=value)
+    """
+    try:
+        return templates.TemplateResponse(name, {"request": request,
+            "datetime": datetime, **context})
+    except Exception:
+        logger.exception(f"Failed to render template: {name}")
+        raise

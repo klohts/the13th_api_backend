@@ -1,0 +1,74 @@
+# backend_v2/services/render.py
+"""
+Jinja2 rendering service for THE13TH backend_v2.
+Ensures correct FileSystemLoader paths and global template utilities.
+"""
+
+from pathlib import Path
+from typing import Any, Dict
+import logging
+
+from fastapi import Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+logger = logging.getLogger("the13th.render")
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+TEMPLATE_DIR = BASE_DIR / "templates"
+
+# -----------------------------------------
+# Legacy Jinja environment (direct rendering)
+# -----------------------------------------
+_jinja_env = Environment(
+    loader=FileSystemLoader(str(TEMPLATE_DIR)),
+    autoescape=select_autoescape(["html", "xml"]),
+)
+
+# Inject globals
+try:
+    from datetime import datetime
+    _jinja_env.globals["datetime"] = datetime
+except Exception as e:
+    logger.error(f"[render] Failed injecting globals: {e}")
+
+# -----------------------------------------
+# FastAPI Jinja environment (template responses)
+# -----------------------------------------
+templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
+
+try:
+    templates.env.globals["datetime"] = datetime
+except Exception:
+    pass
+
+
+# -----------------------------------------
+# Public API
+# -----------------------------------------
+def render_template(template_name: str, context: Dict[str, Any]) -> str:
+    """
+    Render template using the legacy environment.
+    Useful for admin pages and when not using FastAPI Request objects.
+    """
+    try:
+        template = _jinja_env.get_template(template_name)
+        return template.render(**context)
+    except Exception as e:
+        logger.error(f"[render_template] Error rendering '{template_name}': {e}")
+        raise
+
+
+def render_template_response(
+    request: Request, template_name: str, context: Dict[str, Any]
+) -> HTMLResponse:
+    """
+    Render template using FastAPI's Jinja2Templates (supports request context).
+    """
+    try:
+        ctx = {"request": request, **context}
+        return templates.TemplateResponse(template_name, ctx)
+    except Exception as e:
+        logger.error(f"[render_template_response] Error rendering '{template_name}': {e}")
+        raise

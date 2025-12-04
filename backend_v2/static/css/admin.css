@@ -1,0 +1,8 @@
+/* Placeholder admin CSS for THE13TH.
+   Tailwind is loaded via CDN in the templates; this file is here
+   so you have a static mount to hang additional styles on. */
+
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+}

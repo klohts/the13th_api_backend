@@ -1,0 +1,321 @@
+from __future__ import annotations
+
+import logging
+import random
+from datetime import datetime
+from typing import Any, Dict, List
+
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+
+from backend_v2.database import get_db
+
+logger = logging.getLogger("backend_v2.client_sim")
+
+# -------------------------------------------------------------------
+# Simulated agent personas (client-side users)
+# -------------------------------------------------------------------
+
+AGENT_PERSONAS: List[Dict[str, Any]] = [
+    {
+        "name": "Alex Johnson",
+        "aggressiveness": 0.8,
+        "followup_rate": 0.9,
+        "email_responsiveness": 0.7,
+        "negotiation_strength": 0.6,
+    },
+    {
+        "name": "Maria Lopez",
+        "aggressiveness": 0.6,
+        "followup_rate": 0.75,
+        "email_responsiveness": 0.85,
+        "negotiation_strength": 0.8,
+    },
+    {
+        "name": "Sam Patel",
+        "aggressiveness": 0.4,
+        "followup_rate": 0.5,
+        "email_responsiveness": 0.6,
+        "negotiation_strength": 0.4,
+    },
+]
+
+# These match what we use in Simulation Lab deal_distribution
+LEAD_STATUSES: List[str] = ["new", "nurturing", "won", "lost"]
+
+# In-memory simulation history (F5: for timeline graph)
+CLIENT_SIM_HISTORY: List[Dict[str, Any]] = []
+
+
+# -------------------------------------------------------------------
+# Utilities
+# -------------------------------------------------------------------
+
+def _advance_status(status: str) -> str:
+    """
+    Move a lead gently forward in the lifecycle,
+    without inventing new statuses.
+    """
+    if status not in LEAD_STATUSES:
+        return status
+
+    idx = LEAD_STATUSES.index(status)
+    # Do not move beyond "won" / "lost"
+    if status in ("won", "lost"):
+        return status
+    if idx < len(LEAD_STATUSES) - 1:
+        return LEAD_STATUSES[idx + 1]
+    return status
+
+
+def _generate_smart_action(persona: Dict[str, Any], lead_row: Any) -> Dict[str, Any]:
+    """
+    lead_row is a row from sim_leads:
+      (id, full_name, email, status, score, ...)
+    """
+    lead_id = lead_row[0]
+    full_name = lead_row[1] or "there"
+    status = lead_row[3]
+    score = lead_row[4] if len(lead_row) > 4 and lead_row[4] is not None else 50
+
+    if score >= 80:
+        action = "Immediate follow-up: high-intent lead"
+    elif score >= 60:
+        action = "Book a quick discovery call"
+    elif score <= 20:
+        action = "Move to low-touch nurture track"
+    else:
+        if status == "new":
+            action = "Send intro email with value props"
+        elif status == "nurturing":
+            action = "Send case study or social proof"
+        elif status == "won":
+            action = "Onboard to success plan"
+        elif status == "lost":
+            action = "Collect feedback on lost opportunity"
+        else:
+            action = "Light-touch follow-up"
+
+    return {
+        "lead_id": lead_id,
+        "lead_name": full_name,
+        "agent": persona["name"],
+        "recommended_action": action,
+        "created_at": datetime.utcnow().isoformat(),
+        "lead_status": status,
+        "lead_score": score,
+    }
+
+
+def _record_history_entry(
+    total_leads: int,
+    agent_perf: Dict[str, Dict[str, int]],
+    inbox_updates: int,
+    smart_actions_count: int,
+) -> None:
+    """
+    F5: keep a small rolling in-memory history of simulation runs
+    used by the inspector timeline.
+    """
+    global CLIENT_SIM_HISTORY
+
+    leads_touched = sum(p.get("leads_touched", 0) for p in agent_perf.values())
+    followups = sum(p.get("followups", 0) for p in agent_perf.values())
+
+    entry: Dict[str, Any] = {
+        "timestamp": datetime.utcnow().isoformat(timespec="seconds"),
+        "total_leads": total_leads,
+        "leads_touched": leads_touched,
+        "followups": followups,
+        "inbox_actions": inbox_updates,
+        "smart_actions": smart_actions_count,
+    }
+
+    CLIENT_SIM_HISTORY.append(entry)
+    # keep last 30 runs
+    CLIENT_SIM_HISTORY = CLIENT_SIM_HISTORY[-30:]
+
+
+# -------------------------------------------------------------------
+# Core simulation logic
+# -------------------------------------------------------------------
+
+def simulate_client_day(db: Session) -> Dict[str, Any]:
+    """
+    Simulate a 'day in the life' for client-side agents, using Simulation Lab data.
+
+    - Reads from sim_leads (already populated by /admin/sim-lab/seed/burst)
+    - Does NOT touch production lead tables.
+    - For each persona:
+        * touches a subset of leads
+        * may 'respond' (inbox_updates)
+        * may advance lead status
+        * emits smart actions
+    """
+    logger.info("Starting client simulation day using Simulation Lab leads (sim_leads).")
+
+    # We only rely on columns we know exist from sim_lab:
+    # id, full_name, email, status, score, updated_at, ...
+    rows = db.execute(
+        text("SELECT id, full_name, email, status, score FROM sim_leads")
+    ).fetchall()
+    total_leads = len(rows)
+
+    if total_leads == 0:
+        logger.warning("Client simulation: no sim_leads rows found. Did you seed Simulation Lab?")
+        return {
+            "status": "error",
+            "message": "No Simulation Lab leads found. Seed /admin/sim-lab first.",
+            "total_leads": 0,
+            "agents": {},
+            "smart_actions_generated": [],
+            "inbox_updates": 0,
+            "status_movements": 0,
+        }
+
+    smart_actions: List[Dict[str, Any]] = []
+    inbox_updates = 0
+    status_movements = 0
+    agent_perf: Dict[str, Dict[str, int]] = {}
+
+    for persona in AGENT_PERSONAS:
+        name = persona["name"]
+        # How many leads this persona will touch in this simulated "day"
+        touches = min(total_leads, max(5, int(total_leads * 0.1)))
+        leads_touched = 0
+        followups = 0
+        persona_inbox_updates = 0
+        persona_actions = 0
+
+        for _ in range(touches):
+            lead_row = random.choice(rows)
+            lead_id = lead_row[0]
+            status = lead_row[3]
+
+            # Simulated inbox activity
+            if random.random() < persona["email_responsiveness"]:
+                inbox_updates += 1
+                persona_inbox_updates += 1
+
+            # Simulated follow-up & status movement
+            if random.random() < persona["followup_rate"]:
+                new_status = _advance_status(status)
+                if new_status != status:
+                    status_movements += 1
+                    followups += 1
+                    db.execute(
+                        text(
+                            "UPDATE sim_leads "
+                            "SET status = :status, updated_at = :updated_at "
+                            "WHERE id = :id"
+                        ),
+                        {
+                            "status": new_status,
+                            "updated_at": datetime.utcnow(),
+                            "id": lead_id,
+                        },
+                    )
+
+            # Smart action suggestion
+            sa = _generate_smart_action(persona, lead_row)
+            smart_actions.append(sa)
+            persona_actions += 1
+            leads_touched += 1
+
+        agent_perf[name] = {
+            "leads_touched": leads_touched,
+            "followups": followups,
+            "inbox_actions": persona_inbox_updates,
+            "smart_actions": persona_actions,
+        }
+
+    db.commit()
+
+    logger.info(
+        "Client simulation complete. total_leads=%s, actions=%s, inbox_updates=%s, status_movements=%s",
+        total_leads,
+        len(smart_actions),
+        inbox_updates,
+        status_movements,
+    )
+
+    result: Dict[str, Any] = {
+        "status": "ok",
+        "message": "Client-side simulation day completed.",
+        "timestamp": datetime.utcnow().isoformat(),
+        "total_leads": total_leads,
+        "agents": agent_perf,
+        "smart_actions_generated": smart_actions,
+        "inbox_updates": inbox_updates,
+        "status_movements": status_movements,
+    }
+
+    # F5: record entry into in-memory history for the timeline graph
+    _record_history_entry(
+        total_leads=total_leads,
+        agent_perf=agent_perf,
+        inbox_updates=inbox_updates,
+        smart_actions_count=len(smart_actions),
+    )
+
+    return result
+
+
+def get_client_sim_overview(db: Session) -> Dict[str, Any]:
+    """
+    Lightweight snapshot used by dashboards.
+    """
+    total_leads = db.execute(text("SELECT COUNT(*) FROM sim_leads")).scalar()
+    return {
+        "status": "ok",
+        "timestamp": datetime.utcnow().isoformat(),
+        "lead_count": int(total_leads or 0),
+        "agents": AGENT_PERSONAS,
+    }
+
+
+def get_client_sim_history() -> List[Dict[str, Any]]:
+    """
+    F5: expose simulation history for inspector timeline.
+    """
+    return CLIENT_SIM_HISTORY
+
+
+# -------------------------------------------------------------------
+# FastAPI router (API endpoints for programmatic use, not the HTML pages)
+# -------------------------------------------------------------------
+
+router = APIRouter(prefix="/admin/sim-client", tags=["Client Simulation API"])
+
+
+@router.post("/simulate-day")
+def api_simulate_day(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    Run one client simulation day.
+    """
+    return simulate_client_day(db)
+
+
+@router.get("/overview")
+def api_client_sim_overview(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    Return an overview snapshot of the client simulation environment.
+    """
+    return get_client_sim_overview(db)
+
+
+def get_router() -> APIRouter:
+    """
+    Expose router to be included from main.py.
+    """
+    return router
+
+
+# =======================================================
+# Public router factory for backend_v2.main
+# =======================================================
+
+def client_sim_router() -> APIRouter:
+    """Expose the router to main.py."""
+    return router

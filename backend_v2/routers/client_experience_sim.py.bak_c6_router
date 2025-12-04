@@ -1,0 +1,55 @@
+# backend_v2/routers/client_experience_sim.py
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
+
+from backend_v2.database import get_db
+from backend_v2.services.auth_service import authenticated_admin
+from backend_v2.services.render import render_template
+from backend_v2.sim_client_engine import run_client_simulation, get_available_personas
+
+logger = logging.getLogger("the13th.client_experience_sim")
+
+router = APIRouter(
+    prefix="/admin/sim-client/experience",
+    tags=["Client Experience Simulation"],
+)
+
+
+@router.get("", response_class=HTMLResponse)
+def client_experience_page(
+    request: Request,
+    persona: str = Query("hot_lead", description="Persona key to simulate"),
+    days: int = Query(30, ge=7, le=60, description="Number of days to simulate"),
+    db: Session = Depends(get_db),
+    admin: Any = Depends(authenticated_admin),
+) -> HTMLResponse:
+    """
+    Render the Client Experience Simulation page.
+    """
+
+    try:
+        personas = get_available_personas()
+        simulation = run_client_simulation(days=days, persona_key=persona)
+    except Exception as exc:
+        logger.exception("Error generating client simulation: %s", exc)
+        personas = get_available_personas()
+        simulation = None
+
+    context = {
+        "request": request,       # Jinja2 needs this inside context, not as render param
+        "personas": personas,
+        "simulation": simulation,
+    }
+
+    # FIX: Remove request=request argument
+    return render_template(
+        "admin_sim_client_experience.html",
+        context=context,
+    )

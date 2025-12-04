@@ -1,0 +1,33 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
+
+from backend_v2.database import get_db
+from backend_v2.services.auth_service import authenticated_admin
+from backend_v2.services.billing_service import get_admin_billing_metrics
+from backend_v2.services.render import render_template
+
+router = APIRouter(prefix="/admin", tags=["Admin → Billing"])
+
+@router.get("/billing", response_class=HTMLResponse)
+def admin_billing_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    admin = Depends(authenticated_admin),
+):
+    metrics = get_admin_billing_metrics(db)
+
+    context = {
+        "request": request,
+        "user": admin,
+        "metrics": metrics,
+        "subscriptions": [],
+        "invoices": [],
+        "active": "billing",
+    }
+
+    # FIXED: match your flat template structure
+    html = render_template("admin_billing.html", context)
+    return HTMLResponse(html)

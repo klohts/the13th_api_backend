@@ -1,0 +1,75 @@
+
+from __future__ import annotations
+
+import logging
+from datetime import datetime
+from typing import Any, Dict
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
+
+from backend_v2.database import get_db
+from backend_v2.services.auth_service import authenticated_admin
+from backend_v2.services.render import render_template
+from backend_v2.services.sim_lab_service import get_simulation_overview
+
+logger = logging.getLogger("the13th.sim_master.router")
+
+router = APIRouter(
+    prefix="/admin/sim-master",
+    tags=["Simulation Master"],
+)
+
+
+def _safe_int(value: Any) -> int:
+    try:
+        if value is None:
+            return 0
+        return int(value)
+    except Exception:
+        return 0
+
+
+@router.get("", response_class=HTMLResponse)
+def sim_master_dashboard(
+    request: Request,
+    admin: Any = Depends(authenticated_admin),
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """
+    Simulation Master Dashboard — Control tower view of the Simulation Lab.
+    """
+    try:
+        raw: Dict[str, Any] = get_simulation_overview(db=db) or {}
+    except Exception:
+        logger.exception("Failed to fetch simulation overview; falling back to defaults")
+        raw = {}
+
+    summary: Dict[str, Any] = {
+        "companies_seeded": _safe_int(raw.get("companies_seeded")),
+        "leads_in_lab": _safe_int(raw.get("leads_in_lab") or raw.get("lead_count")),
+        "burst_runs": _safe_int(raw.get("burst_runs")),
+        "conversation_volume": _safe_int(raw.get("conversation_volume") or raw.get("message_count")),
+        "client_messages": _safe_int(raw.get("client_messages")),
+        "assistant_messages": _safe_int(raw.get("assistant_messages")),
+        "system_messages": _safe_int(raw.get("system_messages")),
+        "persona_breakdown": raw.get("persona_breakdown") or {},
+        "pipeline_breakdown": raw.get("pipeline_breakdown") or {},
+        "recent_activity": raw.get("recent_activity") or [],
+    }
+
+    environment = {
+        "generated_at": datetime.utcnow(),
+        "route": "/admin/sim-master",
+        "version": "v1.0",
+    }
+
+    context = {
+        "request": request,
+        "admin": admin,
+        "summary": summary,
+        "environment": environment,
+    }
+
+    return render_template("admin_sim_master.html", **context)

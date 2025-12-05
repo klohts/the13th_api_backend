@@ -53,7 +53,7 @@ def create_app() -> FastAPI:
 
     # Core routers
     app.include_router(admin_router.router)
-app.include_router(pilot_request_router.router)
+    app.include_router(pilot_request_router.router)
     app.include_router(api_router.router)
     app.include_router(tenant_router.router)
     app.include_router(client_experience_sim.router)

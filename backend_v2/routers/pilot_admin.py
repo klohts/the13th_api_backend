@@ -1,89 +1,108 @@
-# backend_v2/routers/pilot_admin.py
+from __future__ import annotations
+
 import logging
 from typing import Any, Dict, List
 
-from fastapi import (
-    APIRouter,
-    BackgroundTasks,
-    Depends,
-    HTTPException,
-    Request,
-)
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from sqlmodel import Session, select
 
-from backend_v2.auth import authenticated_admin
 from backend_v2.db import get_db
-from backend_v2.models.pilot import Pilot, PilotStatus
-from backend_v2.services.pilot_approval import (
-    PilotApprovalError,
-    approve_pilot_and_create_checkout,
+from backend_v2.models.pilot import Pilot, PilotStatus, touch_pilot_for_update
+
+logger = logging.getLogger("the13th.backend_v2.routers.pilot_admin")
+
+# Adjust this if your templates directory is different
+templates = Jinja2Templates(directory="backend_v2/templates")
+
+router = APIRouter(
+    prefix="/admin/pilots",
+    tags=["admin-pilots"],
 )
-from backend_v2.email.pilot_notifications import schedule_pilot_approval_email
-
-logger = logging.getLogger(__name__)
-
-router = APIRouter(tags=["admin-pilots"])
-
-templates = Jinja2Templates(directory="the13th/templates")
 
 
-@router.get("/admin/pilots/ui", response_class=HTMLResponse)
-def admin_pilots_ui(
+class ApprovePilotResponse(BaseModel):
+    id: int
+    status: PilotStatus
+
+
+@router.get("/", response_class=HTMLResponse)
+def list_pilots(
     request: Request,
     db: Session = Depends(get_db),
-    admin: Any = Depends(authenticated_admin),
 ) -> HTMLResponse:
     """
-    Admin · Pilot Command Center UI.
-    Shows all pilot requests and their statuses.
+    Admin Pilot Command Center.
+
+    Renders the cinematic pilot review dashboard with all pilot requests.
     """
-    pilots: List[Pilot] = (
-        db.query(Pilot)
-        .order_by(getattr(Pilot, "requested_at", Pilot.id).desc())
-        .all()
-    )
+    logger.info("Loading admin pilot dashboard")
+    statement = select(Pilot).order_by(Pilot.requested_at.desc())
+    pilots: List[Pilot] = list(db.exec(statement).all())
 
     context: Dict[str, Any] = {
         "request": request,
-        "admin": admin,
         "pilots": pilots,
     }
     return templates.TemplateResponse("admin_pilots.html", context)
 
 
-@router.post("/admin/pilots/{pilot_id}/approve")
+@router.post(
+    "/{pilot_id}/approve",
+    response_model=ApprovePilotResponse,
+)
 def approve_pilot(
     pilot_id: int,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    admin: Any = Depends(authenticated_admin),
-) -> JSONResponse:
+) -> ApprovePilotResponse:
     """
-    One-click Approve & Send Checkout.
-    - Creates Stripe Checkout Session
-    - Moves pilot to APPROVAL_SENT
-    - Schedules email with checkout link
+    One-click pilot approval.
+
+    - Finds the pilot by id.
+    - If not found → 404.
+    - If already APPROVAL_SENT or ACTIVE → idempotent, returns current status.
+    - If REQUESTED → marks as APPROVAL_SENT and persists.
+
+    NOTE:
+    Stripe checkout + outbound email can be layered on top of this by
+    extending this function or delegating into a service, without changing
+    the response contract used by the frontend.
     """
-    try:
-        pilot, checkout_url = approve_pilot_and_create_checkout(db=db, pilot_id=pilot_id)
-    except PilotApprovalError as exc:
-        logger.warning("Pilot approval failed for id=%s: %s", pilot_id, exc)
-        raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.exception("Unexpected error approving pilot %s", pilot_id)
-        raise HTTPException(status_code=500, detail="Unable to approve pilot.")
+    logger.info("Approve request for pilot_id=%s", pilot_id)
 
-    schedule_pilot_approval_email(background_tasks, pilot, checkout_url)
+    pilot = db.get(Pilot, pilot_id)
+    if pilot is None:
+        logger.warning("Pilot with id=%s not found", pilot_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pilot not found",
+        )
 
-    payload = {
-        "ok": True,
-        "pilot_id": pilot.id,
-        "status": pilot.status.name
-        if hasattr(pilot.status, "name")
-        else str(pilot.status),
-        "checkout_url": checkout_url,
-    }
+    # Idempotent behaviour for already-processed pilots
+    if pilot.status in (PilotStatus.APPROVAL_SENT, PilotStatus.ACTIVE):
+        logger.info(
+            "Pilot id=%s already in status=%s, returning current state",
+            pilot.id,
+            pilot.status,
+        )
+        return ApprovePilotResponse(id=pilot.id, status=pilot.status)
 
-    return JSONResponse(payload)
+    # Transition REQUESTED -> APPROVAL_SENT
+    if pilot.status == PilotStatus.REQUESTED:
+        logger.info("Marking pilot id=%s as APPROVAL_SENT", pilot.id)
+        pilot.status = PilotStatus.APPROVAL_SENT
+        touch_pilot_for_update(pilot)
+        db.add(pilot)
+        # db.commit() is handled once by get_db, but an explicit commit
+        # here is safe if you prefer immediate persistence semantics.
+        db.commit()
+        db.refresh(pilot)
+
+    logger.info(
+        "Pilot id=%s approval flow complete with status=%s",
+        pilot.id,
+        pilot.status,
+    )
+    return ApprovePilotResponse(id=pilot.id, status=pilot.status)

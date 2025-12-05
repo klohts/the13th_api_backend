@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlmodel import Session, select
-
+from pathlib import Path
 from backend_v2.config import settings
 from backend_v2.db import get_db
 from backend_v2.email.service import send_pilot_checkout_email
@@ -21,7 +21,8 @@ logger = logging.getLogger("the13th.backend_v2.routers.pilot_admin")
 stripe.api_key = settings.stripe_api_key
 
 # Adjust this if your templates directory is different
-templates = Jinja2Templates(directory="templates")
+BASE_TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
+templates = Jinja2Templates(directory=str(BASE_TEMPLATE_DIR))
 
 router = APIRouter(
     prefix="/admin/pilots",

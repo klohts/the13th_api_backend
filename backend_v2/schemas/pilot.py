@@ -59,14 +59,21 @@ class PilotRequest(BaseModel):
             v = "https://" + v
         return v
 
-    # 🔁 Backwards-compat for existing email code expecting `work_email`
+    # --- Backwards-compat for existing email + API code ---
+
     @property
     def work_email(self) -> EmailStr:
         """
-        Alias for legacy code that expects `pilot.work_email`.
-        Uses the normalized contact_email field.
+        Legacy alias used by email/service.py.
         """
         return self.contact_email
+
+    @property
+    def full_name(self) -> str:
+        """
+        Legacy alias for templates / emails expecting `pilot.full_name`.
+        """
+        return self.contact_name
 
 
 # For compatibility with any internal naming using "PilotCreateFromLead"

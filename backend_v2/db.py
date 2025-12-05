@@ -57,3 +57,7 @@ def get_session() -> Generator[Session, None, None]:
         raise
     finally:
         session.close()
+
+
+# ✅ ALIAS FOR ROUTERS EXPECTING get_db
+get_db = get_session

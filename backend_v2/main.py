@@ -3,6 +3,12 @@ from __future__ import annotations
 import logging
 from typing import Dict
 
+from dotenv import load_dotenv  # NEW: load .env into os.environ
+
+# Load environment variables from .env at project root
+# This runs before the app is created so all downstream modules see the env.
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -14,11 +20,15 @@ from backend_v2.routers import api as api_router
 from backend_v2.routers import tenant as tenant_router
 from backend_v2.routers import client_experience_sim
 from backend_v2.api import pilot as pilot_api
-import backend_v2.routers.pilot_admin_ui as pilot_admin_ui
-import backend_v2.routers.pilot_admin_api as pilot_admin_api
+
+# NEW: consolidated admin + webhook routers
+import backend_v2.routers.pilot_admin as pilot_admin_router
+import backend_v2.routers.stripe_webhooks as stripe_webhooks_router
+
 from backend_v2.services.render import STATIC_DIR
 
 logger = logging.getLogger("backend_v2.main")
+
 
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, debug=settings.debug)
@@ -45,11 +55,15 @@ def create_app() -> FastAPI:
     app.include_router(api_router.router)
     app.include_router(tenant_router.router)
     app.include_router(client_experience_sim.router)
-    app.include_router(pilot_api.router)
-    app.include_router(pilot_admin_api.router)  # ← JSON API
 
-    # Admin Pilot Dashboard UI
-    app.include_router(pilot_admin_ui.router)
+    # Public pilot intake API (from marketing site)
+    app.include_router(pilot_api.router)
+
+    # Admin Pilot Command Center (UI + Approve & Send Checkout)
+    app.include_router(pilot_admin_router.router)
+
+    # Stripe webhook to activate pilots / sync payments
+    app.include_router(stripe_webhooks_router.router)
 
     # Static files
     STATIC_DIR.mkdir(parents=True, exist_ok=True)

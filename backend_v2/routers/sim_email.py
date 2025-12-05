@@ -60,3 +60,15 @@ def email_overview(
     """
     payload: Dict[str, Any] = get_email_overview(db)
     return JSONResponse(content=payload)
+
+@router.get("/email/test")
+def test_email(db: Session = Depends(get_db)):
+    from backend_v2.email.service import send_email
+
+    send_email(
+        to="rhettlohts@gmail.com",
+        subject="THE13TH Email Test",
+        html="<p>Your THE13TH email system is working successfully 🎉</p>"
+    )
+
+    return {"status": "ok"}

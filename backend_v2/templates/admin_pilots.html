@@ -1,637 +1,631 @@
+<!-- the13th/templates/admin_pilots.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="UTF-8" />
+    <title>THE13TH — Admin · Pilot Command Center</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Cinematic Admin Pilot UI Patch -->
     <style>
-      body {
-        font-size: 17px;
-        line-height: 1.6;
-        -webkit-font-smoothing: antialiased;
-      }
+        :root {
+            --bg-start: #4b0082;
+            --bg-end: #0a0014;
 
-      /* Outer shell */
-      .admin-pilot-shell {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 48px 32px 80px;
-      }
+            --glass-bg: rgba(255,255,255,0.06);
+            --glass-border: rgba(255,255,255,0.12);
 
-      .admin-pilot-header {
-        margin-bottom: 32px;
-      }
+            --accent-warm: #f6d6a8;
+            --accent-purple: #7c3aed;
+            --accent-fuchsia: #d946ef;
 
-      .admin-pilot-header h1 {
-        font-size: 1.8rem;
-        letter-spacing: 0.04em;
-      }
+            --text-main: #f9f5ff;
+            --text-soft: rgba(240,230,255,0.75);
+        }
 
-      .admin-pilot-header p {
-        margin-top: 8px;
-        font-size: 0.98rem;
-        opacity: 0.85;
-      }
+        * { box-sizing: border-box; }
 
-      /* Legend + tags */
-      .pilot-legend {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 12px;
-        font-size: 0.9rem;
-        opacity: 0.9;
-      }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+            background: radial-gradient(circle at top left, var(--bg-start), var(--bg-end));
+            color: var(--text-main);
+        }
 
-      .legend-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 4px 10px;
-        border-radius: 999px;
-        font-size: 0.8rem;
-        font-weight: 500;
-        background: rgba(0, 0, 0, 0.5);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-      }
+        .page-shell {
+            max-width: 1380px;
+            margin: 0 auto;
+            padding: 44px 28px 70px;
+        }
 
-      .legend-pill-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 999px;
-      }
+        .badge {
+            display: inline-flex;
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 11px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            background: linear-gradient(120deg, rgba(124,58,237,0.35), rgba(217,70,239,0.35));
+            border: 1px solid rgba(255,255,255,0.14);
+            backdrop-filter: blur(10px);
+        }
 
-      /* Main card */
-      .pilot-table-card {
-        border-radius: 22px;
-        border: 1px solid rgba(255, 144, 64, 0.16);
-        background: radial-gradient(circle at top left,
-                    rgba(255, 144, 64, 0.09),
-                    rgba(5, 0, 10, 0.96));
-        box-shadow:
-          0 26px 60px rgba(0, 0, 0, 0.85),
-          0 0 0 1px rgba(255, 255, 255, 0.02);
-        overflow: hidden;
-      }
+        h1 {
+            font-size: 34px;
+            margin: 12px 0 6px;
+            font-weight: 600;
+            color: var(--accent-warm);
+            letter-spacing: 0.02em;
+        }
 
-      /* Table layout */
-      .pilot-table {
-        width: 100%;
-        border-collapse: collapse;
-      }
+        h2 {
+            font-size: 15px;
+            font-weight: 500;
+            margin: 0 0 26px;
+            color: var(--text-soft);
+        }
 
-      .pilot-table thead {
-        background: linear-gradient(
-          to right,
-          rgba(0, 0, 0, 0.75),
-          rgba(20, 5, 30, 0.9)
-        );
-      }
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 24px;
+            margin-bottom: 26px;
+        }
 
-      .pilot-table th {
-        font-size: 0.95rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        padding: 12px 18px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        white-space: nowrap;
-      }
+        .legend {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            font-size: 12px;
+            letter-spacing: 0.06em;
+        }
 
-      .pilot-table td {
-        font-size: 1rem;
-        padding: 13px 18px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-        vertical-align: middle;
-      }
+        .pill {
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            backdrop-filter: blur(8px);
+        }
 
-      .pilot-table tbody tr:last-child td {
-        border-bottom: none;
-      }
+        .pill-requested {
+            background: rgba(126,234,160,0.15);
+            color: #9dffd1;
+            border: 1px solid rgba(126,234,160,0.25);
+        }
 
-      .pilot-table tbody tr {
-        transition: background 160ms ease-out, transform 160ms ease-out;
-      }
+        .pill-approval {
+            background: rgba(255,214,102,0.18);
+            color: #ffe29b;
+            border: 1px solid rgba(255,214,102,0.25);
+        }
 
-      .pilot-table tbody tr:hover {
-        background: radial-gradient(
-          circle at left,
-          rgba(255, 144, 64, 0.18),
-          transparent 65%
-        );
-        transform: translateY(-1px);
-      }
+        .pill-active {
+            background: rgba(80,200,255,0.18);
+            color: #a5eaff;
+            border: 1px solid rgba(80,200,255,0.25);
+        }
 
-      /* Empty state row */
-      .pilot-table .empty-row td {
-        text-align: center;
-        font-size: 1rem;
-        padding: 22px 18px;
-        opacity: 0.92;
-      }
+        .card {
+            margin-top: 10px;
+            border-radius: 22px;
+            background: linear-gradient(160deg, rgba(255,255,255,0.09), rgba(10,0,20,0.9));
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.6);
+            backdrop-filter: blur(20px);
+            overflow: hidden;
+        }
 
-      /* Status + action badges */
-      .status-badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 96px;
-        padding: 5px 11px;
-        font-size: 0.9rem;
-        font-weight: 500;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.09);
-        background: linear-gradient(
-          to bottom right,
-          rgba(0, 0, 0, 0.85),
-          rgba(20, 5, 30, 0.95)
-        );
-        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7);
-      }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
 
-      .status-badge--requested {
-        border-color: rgba(255, 199, 94, 0.85);
-        box-shadow: 0 0 12px rgba(255, 199, 94, 0.35);
-      }
+        thead {
+            background: linear-gradient(
+                90deg,
+                rgba(30,10,60,0.95),
+                rgba(60,20,120,0.95)
+            );
+        }
 
-      .status-badge--approval-sent {
-        border-color: rgba(120, 219, 255, 0.85);
-        box-shadow: 0 0 12px rgba(120, 219, 255, 0.35);
-      }
+        th, td {
+            padding: 16px 18px;
+        }
 
-      .status-badge--active {
-        border-color: rgba(72, 240, 164, 0.95);
-        box-shadow: 0 0 16px rgba(72, 240, 164, 0.45);
-      }
+        th {
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: rgba(214,190,255,0.85);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
 
-      .primary-action-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        padding: 7px 16px;
-        border-radius: 999px;
-        border: none;
-        font-size: 0.92rem;
-        font-weight: 500;
-        cursor: pointer;
-        background: radial-gradient(circle at top left,
-                   rgba(255, 144, 64, 0.28),
-                   rgba(255, 92, 0, 0.85));
-        box-shadow:
-          0 12px 28px rgba(0, 0, 0, 0.9),
-          0 0 0 1px rgba(255, 255, 255, 0.08);
-        transition:
-          transform 130ms ease-out,
-          box-shadow 130ms ease-out,
-          background 130ms ease-out,
-          opacity 130ms ease-out;
-      }
+        tbody tr:nth-child(even) {
+            background: rgba(255,255,255,0.015);
+        }
 
-      .primary-action-btn:hover {
-        transform: translateY(-1px);
-        box-shadow:
-          0 16px 42px rgba(0, 0, 0, 0.95),
-          0 0 0 1px rgba(255, 255, 255, 0.16);
-        opacity: 0.98;
-      }
+        tbody tr:hover {
+            background: radial-gradient(circle at top left, rgba(124,58,237,0.22), rgba(1,0,16,0.96));
+        }
 
-      .primary-action-btn:active {
-        transform: translateY(0);
-        box-shadow:
-          0 6px 20px rgba(0, 0, 0, 0.9),
-          0 0 0 1px rgba(255, 255, 255, 0.12);
-      }
+        .subline {
+            font-size: 12px;
+            color: rgba(226,211,255,0.7);
+        }
 
-      /* Refresh + timestamp */
-      .pilot-toolbar {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 10px;
-        margin-bottom: 18px;
-        font-size: 0.88rem;
-        opacity: 0.9;
-      }
+        .status-pill {
+            display: inline-flex;
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            backdrop-filter: blur(10px);
+        }
 
-      .refresh-pill {
-        padding: 5px 14px;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        background: rgba(0, 0, 0, 0.55);
-        cursor: pointer;
-        font-size: 0.86rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        transition: background 120ms ease-out, border-color 120ms ease-out;
-      }
+        .status-requested {
+            background: rgba(126,234,160,0.2);
+            color: #9dffd1;
+        }
 
-      .refresh-pill:hover {
-        background: rgba(255, 144, 64, 0.28);
-        border-color: rgba(255, 144, 64, 0.9);
-      }
+        .status-approval_sent {
+            background: rgba(255,214,102,0.24);
+            color: #ffe29b;
+        }
 
-      .refresh-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 999px;
-        background: rgba(144, 255, 190, 0.9);
-      }
+        .status-active {
+            background: rgba(80,200,255,0.24);
+            color: #a5eaff;
+        }
+
+        .approve-btn {
+            border: none;
+            border-radius: 999px;
+            padding: 10px 18px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-fuchsia));
+            color: #fff;
+            box-shadow: 0 14px 34px rgba(0,0,0,0.6);
+            transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.15s;
+        }
+
+        .approve-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+        }
+
+        .approve-btn:disabled {
+            opacity: 0.5;
+            cursor: default;
+            box-shadow: none;
+        }
+
+        .empty-row td {
+            text-align: center;
+            padding: 34px 16px;
+            color: rgba(230,213,255,0.65);
+            font-size: 14px;
+        }
+
+        /* KPI STRIP */
+        .metrics-card {
+            margin-top: 8px;
+            margin-bottom: 14px;
+            border-radius: 20px;
+            background: radial-gradient(circle at top left, rgba(124,58,237,0.3), rgba(10,0,20,0.96));
+            border: 1px solid rgba(255,255,255,0.14);
+            box-shadow: 0 26px 50px rgba(0,0,0,0.6);
+            backdrop-filter: blur(18px);
+            padding: 16px 20px 14px;
+        }
+
+        .metrics-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: var(--text-soft);
+        }
+
+        .metrics-header-left span {
+            font-weight: 500;
+            color: var(--accent-warm);
+        }
+
+        .metrics-header-right {
+            font-size: 11px;
+            opacity: 0.85;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .metric {
+            padding: 10px 14px 12px;
+            border-radius: 16px;
+            background: rgba(6,3,20,0.86);
+            border: 1px solid rgba(255,255,255,0.16);
+        }
+
+        .metric-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: rgba(235,222,255,0.8);
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            font-size: 20px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .metric-sub {
+            font-size: 11px;
+            color: rgba(230,213,255,0.7);
+            margin-top: 2px;
+        }
+
+        .metric-value.accent-gold {
+            color: #ffdba8;
+        }
+
+        .metric-value.accent-aqua {
+            color: #9de3ff;
+        }
+
+        .metric-value.accent-lime {
+            color: #b2ffc9;
+        }
+
+        .metric-value.accent-purple {
+            color: #c4a5ff;
+        }
+
+        /* TOAST NOTIFICATION */
+        .toast {
+            position: fixed;
+            right: 26px;
+            bottom: 26px;
+            max-width: 360px;
+            padding: 12px 16px;
+            border-radius: 18px;
+            background: radial-gradient(circle at top left, rgba(124,58,237,0.9), rgba(15,6,35,0.95));
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fffaf3;
+            font-size: 13px;
+            box-shadow: 0 18px 55px rgba(0,0,0,0.85);
+            opacity: 0;
+            transform: translateY(18px);
+            pointer-events: none;
+            transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+            z-index: 40;
+        }
+
+        .toast-show {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 2px;
+        }
+
+        .toast-body {
+            font-size: 12px;
+            opacity: 0.92;
+        }
+
+        .toast-pill {
+            display: inline-flex;
+            margin-top: 6px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            background: rgba(10,10,30,0.9);
+            border: 1px solid rgba(255,255,255,0.25);
+        }
+
+        @media (max-width: 900px) {
+            .metric-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 640px) {
+            .metric-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 26px;
+            }
+        }
     </style>
-
-
-<!-- Font Upgrade Patch -->
-<style>
-    body {
-        font-size: 17px !important;
-        line-height: 1.55;
-    }
-    h1, h2, h3 {
-        font-size: 1.45rem !important;
-        letter-spacing: 0.3px;
-    }
-    .pilot-table th {
-        font-size: 0.95rem !important;
-        font-weight: 600 !important;
-        padding-top: 10px;
-        padding-bottom: 10px;
-    }
-    .pilot-table td {
-        font-size: 1rem !important;
-        padding-top: 12px;
-        padding-bottom: 12px;
-    }
-    .status-badge {
-        font-size: 0.95rem !important;
-        padding: 5px 10px;
-    }
-    .empty-row {
-        font-size: 1rem !important;
-        opacity: 0.9;
-    }
-</style>
-
-  <meta charset="UTF-8" />
-  <title>THE13TH — Admin Pilot Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body {
-      background: radial-gradient(circle at top left, #4b0082, #05000b 60%);
-    }
-  </style>
-
-    <!-- Cinematic Admin Pilot UI Override -->
-    <style id="pilot-admin-cinematic-override">
-      body {
-        font-size: 17px !important;
-        line-height: 1.6 !important;
-        -webkit-font-smoothing: antialiased;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 1rem !important;
-      }
-
-      thead {
-        background: linear-gradient(
-          to right,
-          rgba(0, 0, 0, 0.8),
-          rgba(20, 5, 30, 0.95)
-        ) !important;
-      }
-
-      th {
-        font-size: 0.95rem !important;
-        font-weight: 600 !important;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        padding: 12px 18px !important;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
-      }
-
-      td {
-        font-size: 1rem !important;
-        padding: 13px 18px !important;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
-        vertical-align: middle !important;
-      }
-
-      tbody tr:last-child td {
-        border-bottom: none !important;
-      }
-
-      tbody tr {
-        transition: background 160ms ease-out, transform 160ms ease-out;
-      }
-
-      tbody tr:hover {
-        background: radial-gradient(
-          circle at left,
-          rgba(255, 144, 64, 0.16),
-          transparent 65%
-        ) !important;
-        transform: translateY(-1px);
-      }
-
-      .status-badge {
-        font-size: 0.9rem !important;
-        font-weight: 500 !important;
-        border-radius: 999px !important;
-        padding: 5px 11px !important;
-      }
-
-      .pilots-empty-state,
-      .empty-row td {
-        font-size: 1rem !important;
-        opacity: 0.95 !important;
-        text-align: center;
-        padding: 22px 18px !important;
-      }
-    </style>
-
 </head>
-<body class="min-h-screen bg-[#05000b] text-slate-100 antialiased">
-  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-    <!-- Header -->
-    <header class="flex items-center justify-between mb-6 sm:mb-8">
-      <div>
-        <div class="text-2xl font-extrabold tracking-tight">
-          <span class="text-purple-900">THE</span><span class="text-gray-50">13TH</span>
+
+<body>
+<div class="page-shell">
+
+    <div class="header-row">
+        <div>
+            <div class="badge">Admin · Pilot Command Center</div>
+            <h1>Revenue Intelligence Pilot Requests</h1>
+            <h2>Review incoming brokerages, qualify instantly, and trigger live Stripe checkout in one click.</h2>
+
+            <div class="legend">
+                <span>LEGEND:</span>
+                <span class="pill pill-requested">Requested</span>
+                <span class="pill pill-approval">Approval Sent</span>
+                <span class="pill pill-active">Active</span>
+            </div>
         </div>
-        <p class="text-xs text-purple-200 mt-1">
-          Admin • Pilot Command Center
-        </p>
-      </div>
-      <div class="text-right text-xs text-slate-300">
-        <div class="font-semibold text-purple-100">Pilot Revenue Activation</div>
-        <div id="env-tag" class="inline-flex mt-1 rounded-full border border-purple-500/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-purple-100 bg-purple-900/40">
-          Admin View
+    </div>
+
+    <!-- KPI STRIP -->
+    <div class="metrics-card">
+        <div class="metrics-header">
+            <div class="metrics-header-left">
+                <span>Pilot Funnel ·</span>
+                <span id="metric-total-label"> Live view</span>
+            </div>
+            <div class="metrics-header-right">
+                Auto-refresh every 60s when this tab is active.
+            </div>
         </div>
-      </div>
-    </header>
+        <div class="metric-grid">
+            <div class="metric">
+                <div class="metric-label">Total Pilots</div>
+                <div class="metric-value accent-gold" id="metric-total">0</div>
+                <div class="metric-sub">Across all statuses</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Requested</div>
+                <div class="metric-value accent-lime" id="metric-requested">0</div>
+                <div class="metric-sub">Awaiting approval</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Checkout Sent</div>
+                <div class="metric-value accent-purple" id="metric-approval-sent">0</div>
+                <div class="metric-sub">Stripe link emailed</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Active · Est. MRR</div>
+                <div class="metric-value accent-aqua" id="metric-active-mrr">$0</div>
+                <div class="metric-sub" id="metric-active-count">0 active pilots</div>
+            </div>
+        </div>
+    </div>
 
-    <!-- Status & Controls -->
-    <section class="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <div>
-        <h1 class="text-xl sm:text-2xl font-bold text-white mb-1">
-          Revenue Intelligence Pilot Requests
-        </h1>
-        <p class="text-xs text-slate-300 max-w-xl">
-          Review incoming brokerages, see fit at a glance, and trigger checkout in one click.
-        </p>
-      </div>
-      <div class="flex items-center gap-3 text-xs">
-        <button id="refresh-btn"
-                class="inline-flex items-center gap-1 rounded-full border border-purple-500/70 bg-purple-900/40 px-3 py-1 font-semibold text-purple-100 hover:bg-purple-800/70 transition">
-          <span>&#x21bb;</span>
-          <span>Refresh</span>
-        </button>
-        <span id="last-updated" class="text-[11px] text-slate-400"></span>
-      </div>
-    </section>
-
-    <!-- Filters / Legend -->
-    <section class="mb-4 sm:mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <div class="flex flex-wrap items-center gap-2 text-[11px] text-slate-300">
-        <span class="uppercase tracking-wide text-slate-400">Legend:</span>
-        <span class="inline-flex items-center gap-1 rounded-full bg-slate-800/80 px-2 py-0.5">
-          <span class="h-2 w-2 rounded-full bg-amber-400"></span>
-          <span>Requested</span>
-        </span>
-        <span class="inline-flex items-center gap-1 rounded-full bg-slate-800/80 px-2 py-0.5">
-          <span class="h-2 w-2 rounded-full bg-sky-400"></span>
-          <span>Approval Sent</span>
-        </span>
-        <span class="inline-flex items-center gap-1 rounded-full bg-slate-800/80 px-2 py-0.5">
-          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-          <span>Active</span>
-        </span>
-      </div>
-      <div class="text-[11px] text-slate-400">
-        Approve will call
-        <code class="px-1 rounded bg-slate-900/80 border border-slate-600/60 text-[10px]">POST /admin/pilots/&lt;id&gt;/approve</code>
-      </div>
-    </section>
-
-    <!-- Table wrapper -->
-    <section class="rounded-3xl border border-purple-700/40 bg-[#100016]/70 shadow-xl overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="min-w-full text-left text-xs text-slate-200">
-          <thead class="bg-purple-950/70 border-b border-purple-800/50 text-[11px] uppercase tracking-wide text-slate-300">
+    <div class="card">
+        <table id="pilot-table">
+            <thead>
             <tr>
-              <th class="px-3 py-3">Brokerage</th>
-              <th class="px-3 py-3">Contact</th>
-              <th class="px-3 py-3">Role</th>
-              <th class="px-3 py-3 text-center">Agents</th>
-              <th class="px-3 py-3">Status</th>
-              <th class="px-3 py-3">Problem / Notes</th>
-              <th class="px-3 py-3 text-right">Requested</th>
-              <th class="px-3 py-3 text-right">Action</th>
+                <th>Brokerage</th>
+                <th>Contact</th>
+                <th>Role</th>
+                <th>Agents</th>
+                <th>Status</th>
+                <th>Problem / Notes</th>
+                <th>Requested</th>
+                <th>Action</th>
             </tr>
-          </thead>
-          <tbody id="pilot-rows" class="divide-y divide-purple-900/40 bg-[#080010]/80">
-            <!-- Rows inserted by JS -->
-          </tbody>
+            </thead>
+            <tbody>
+            {% if pilots %}
+                {% for pilot in pilots %}
+                {% set status_value = pilot.status.name if pilot.status and pilot.status.name is defined else pilot.status %}
+                <tr data-pilot-id="{{ pilot.id }}">
+                    <td>{{ pilot.brokerage_name or "—" }}</td>
+                    <td>
+                        <div>{{ pilot.contact_name or "—" }}</div>
+                        <div class="subline">{{ pilot.contact_email or pilot.email or "" }}</div>
+                    </td>
+                    <td>{{ pilot.role or "—" }}</td>
+                    <td>{{ pilot.agents or pilot.agents_count or "—" }}</td>
+                    <td>
+                        <span class="status-pill
+                            {% if status_value == 'REQUESTED' %}status-requested{% endif %}
+                            {% if status_value == 'APPROVAL_SENT' %}status-approval_sent{% endif %}
+                            {% if status_value == 'ACTIVE' %}status-active{% endif %}">
+                            {{ status_value.replace('_',' ') if status_value else '' }}
+                        </span>
+                    </td>
+                    <td>{{ pilot.problem_notes or "—" }}</td>
+                    <td>
+                        {% if pilot.requested_at %}
+                            {{ pilot.requested_at.strftime("%b %d, %Y • %I:%M %p") }}
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        <button class="approve-btn" {% if status_value != 'REQUESTED' %}disabled{% endif %}>
+                            {% if status_value == 'APPROVAL_SENT' %}Checkout Sent
+                            {% elif status_value == 'ACTIVE' %}Active
+                            {% else %}Approve &amp; Send Checkout{% endif %}
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr class="empty-row">
+                    <td colspan="8">No pilot requests yet.</td>
+                </tr>
+            {% endif %}
+            </tbody>
         </table>
-      </div>
-      <div id="empty-state" class="hidden px-6 py-6 text-center text-xs text-slate-400">
-        No pilot requests yet. Once marketing starts sending traffic, they’ll show here.
-      </div>
-      <div id="error-state" class="hidden px-6 py-4 text-center text-xs text-rose-300 bg-rose-950/40 border-t border-rose-800/50">
-        There was a problem loading pilots. Check the API logs and refresh.
-      </div>
-    </section>
-  </div>
+    </div>
+</div>
 
-  <script>
-    (function () {
-      const API_BASE = window.location.origin;
+<!-- Toast notification container -->
+<div class="toast" id="toast">
+    <div class="toast-title" id="toast-title"></div>
+    <div class="toast-body" id="toast-body"></div>
+    <div class="toast-pill">ADMIN UPDATE</div>
+</div>
 
-      const rowsEl = document.getElementById("pilot-rows");
-      const emptyStateEl = document.getElementById("empty-state");
-      const errorStateEl = document.getElementById("error-state");
-      const refreshBtn = document.getElementById("refresh-btn");
-      const lastUpdatedEl = document.getElementById("last-updated");
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const table = document.querySelector("#pilot-table");
+    const toastEl = document.getElementById("toast");
+    const toastTitle = document.getElementById("toast-title");
+    const toastBody = document.getElementById("toast-body");
 
-      function formatDate(value) {
-        if (!value) return "";
-        try {
-          const d = new Date(value);
-          if (Number.isNaN(d.getTime())) return String(value);
-          return d.toLocaleString(undefined, {
-            year: "numeric",
-            month: "short",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-        } catch (e) {
-          return String(value);
+    const METRIC_ANCHOR_MRR = 699; // anchor per active pilot
+
+    function showToast(title, body) {
+        if (!toastEl) return;
+        toastTitle.textContent = title || "";
+        toastBody.textContent = body || "";
+        toastEl.classList.add("toast-show");
+        setTimeout(() => {
+            toastEl.classList.remove("toast-show");
+        }, 4000);
+    }
+
+    function recalculateMetrics() {
+        const rows = document.querySelectorAll("#pilot-table tbody tr[data-pilot-id]");
+        let total = 0;
+        let requested = 0;
+        let approvalSent = 0;
+        let active = 0;
+
+        rows.forEach((row) => {
+            const pill = row.querySelector(".status-pill");
+            if (!pill) return;
+            total += 1;
+
+            if (pill.classList.contains("status-requested")) {
+                requested += 1;
+            } else if (pill.classList.contains("status-approval_sent")) {
+                approvalSent += 1;
+            } else if (pill.classList.contains("status-active")) {
+                active += 1;
+            }
+        });
+
+        const totalEl = document.getElementById("metric-total");
+        const requestedEl = document.getElementById("metric-requested");
+        const approvalEl = document.getElementById("metric-approval-sent");
+        const activeMrrEl = document.getElementById("metric-active-mrr");
+        const activeCountEl = document.getElementById("metric-active-count");
+
+        if (totalEl) totalEl.textContent = total.toString();
+        if (requestedEl) requestedEl.textContent = requested.toString();
+        if (approvalEl) approvalEl.textContent = approvalSent.toString();
+
+        const estMrr = active * METRIC_ANCHOR_MRR;
+        if (activeMrrEl) {
+            activeMrrEl.textContent = estMrr
+                ? "$" + estMrr.toLocaleString("en-US")
+                : "$0";
         }
-      }
-
-      function statusBadge(status) {
-        const s = (status || "").toString().toUpperCase();
-        let color = "bg-slate-700/80 text-slate-100 border-slate-500/60";
-        if (s.includes("REQUEST")) {
-          color = "bg-amber-900/70 text-amber-200 border-amber-500/70";
-        } else if (s.includes("APPROVAL")) {
-          color = "bg-sky-900/70 text-sky-200 border-sky-500/70";
-        } else if (s.includes("ACTIVE")) {
-          color = "bg-emerald-900/70 text-emerald-200 border-emerald-500/70";
-        } else if (s.includes("REJECT")) {
-          color = "bg-rose-900/70 text-rose-200 border-rose-500/70";
+        if (activeCountEl) {
+            activeCountEl.textContent = active === 1
+                ? "1 active pilot"
+                : active.toString() + " active pilots";
         }
-        return '<span class="inline-flex items-center rounded-full border ' + color +
-               ' px-2 py-0.5 text-[10px] font-semibold tracking-wide">' + s + "</span>";
-      }
+    }
 
-      function escapeHtml(str) {
-        if (!str) return "";
-        return String(str)
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;");
-      }
+    // Initial KPI calc
+    recalculateMetrics();
 
-      function buildNotes(pilot) {
-        const parts = [];
-        if (pilot.notes) {
-          parts.push(pilot.notes);
-        }
-        if (pilot.lead_volume) {
-          parts.push("Lead volume: " + pilot.lead_volume);
-        }
-        return parts.join("\n\n");
-      }
+    if (table) {
+        table.addEventListener("click", async (event) => {
+            const btn = event.target.closest(".approve-btn");
+            if (!btn || btn.disabled) return;
 
-      function pilotRow(pilot) {
-        const id = pilot.id ?? pilot.pilot_id ?? pilot["id"];
-        const brokerage = pilot.brokerage_name || pilot.company || "";
-        const fullName = pilot.full_name || ((pilot.first_name || "") + " " + (pilot.last_name || "")).trim();
-        const email = pilot.email || "";
-        const role = pilot.role || "";
-        const agents = pilot.num_agents ?? pilot.team_size ?? "";
-        const created = pilot.created_at || pilot.created_ts || pilot.created || null;
-        const status = pilot.status || pilot.pilot_status || "REQUESTED";
-        const notes = buildNotes(pilot);
-
-        const canApprove = status.toString().toUpperCase().includes("REQUEST");
-
-        const approveBtn = canApprove
-          ? '<button data-pilot-id="' + id + '" class="approve-btn inline-flex items-center rounded-full bg-emerald-500/90 hover:bg-emerald-400 text-xs font-semibold text-slate-950 px-3 py-1 transition">Approve &amp; Send Checkout</button>'
-          : '<span class="text-[11px] text-slate-400">—</span>';
-
-        const niceNotes = escapeHtml(notes || "").replace(/\n/g, "<br />");
-
-        return `
-          <tr class="align-top">
-            <td class="px-3 py-3">
-              <div class="font-semibold text-xs text-white">${escapeHtml(brokerage || "—")}</div>
-            </td>
-            <td class="px-3 py-3">
-              <div class="text-xs text-slate-100">${escapeHtml(fullName || "—")}</div>
-              <div class="text-[11px] text-purple-200">${escapeHtml(email || "")}</div>
-            </td>
-            <td class="px-3 py-3 text-xs">${escapeHtml(role || "—")}</td>
-            <td class="px-3 py-3 text-center text-xs">
-              ${agents !== null && agents !== undefined && agents !== "" ? escapeHtml(String(agents)) : "—"}
-            </td>
-            <td class="px-3 py-3 text-xs">
-              ${statusBadge(status)}
-            </td>
-            <td class="px-3 py-3 text-[11px] text-slate-200">
-              ${niceNotes || "<span class='text-slate-500'>—</span>"}
-            </td>
-            <td class="px-3 py-3 text-right text-[11px] text-slate-300">
-              ${escapeHtml(formatDate(created))}
-            </td>
-            <td class="px-3 py-3 text-right">
-              ${approveBtn}
-            </td>
-          </tr>
-        `;
-      }
-
-      async function fetchPilots() {
-        errorStateEl.classList.add("hidden");
-        try {
-          const res = await fetch(API_BASE + "/admin/pilots/", {
-            headers: { "Accept": "application/json" },
-          });
-          if (!res.ok) {
-            console.error("Failed to fetch pilots:", res.status, await res.text());
-            throw new Error("Failed to fetch pilots");
-          }
-
-          const data = await res.json();
-          const pilots = Array.isArray(data) ? data : (data.items || data.results || []);
-
-          rowsEl.innerHTML = "";
-          if (!pilots || pilots.length === 0) {
-            emptyStateEl.classList.remove("hidden");
-          } else {
-            emptyStateEl.classList.add("hidden");
-            rowsEl.innerHTML = pilots.map(pilotRow).join("");
-          }
-
-          const now = new Date();
-          lastUpdatedEl.textContent = "Updated " + now.toLocaleTimeString();
-
-          attachApproveHandlers();
-        } catch (err) {
-          console.error("Error loading pilots:", err);
-          errorStateEl.classList.remove("hidden");
-        }
-      }
-
-      function attachApproveHandlers() {
-        const buttons = document.querySelectorAll(".approve-btn");
-        buttons.forEach((btn) => {
-          btn.addEventListener("click", async (event) => {
-            const pilotId = btn.getAttribute("data-pilot-id");
+            const row = btn.closest("tr");
+            const pilotId = row?.dataset?.pilotId;
             if (!pilotId) return;
 
-            const confirmMsg = "Approve this pilot and trigger checkout email?";
-            if (!window.confirm(confirmMsg)) return;
-
+            const originalLabel = btn.textContent;
             btn.disabled = true;
-            btn.textContent = "Approving…";
+            btn.textContent = "Sending…";
 
             try {
-              const res = await fetch(API_BASE + "/admin/pilots/" + encodeURIComponent(pilotId) + "/approve", {
-                method: "POST",
-                headers: { "Accept": "application/json" },
-              });
+                const response = await fetch(`/admin/pilots/${pilotId}/approve`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Requested-With": "XMLHttpRequest"
+                    },
+                    body: JSON.stringify({})
+                });
 
-              if (!res.ok) {
-                const text = await res.text();
-                console.error("Approve failed:", res.status, text);
-                alert("Approve failed. Check API logs.");
-              } else {
-                await fetchPilots();
-              }
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                const statusRaw = data.status || "";
+                const status = statusRaw.toUpperCase();
+
+                const pill = row.querySelector(".status-pill");
+                if (pill) {
+                    pill.classList.remove(
+                        "status-requested",
+                        "status-approval_sent",
+                        "status-active"
+                    );
+
+                    if (status === "APPROVAL_SENT") {
+                        pill.classList.add("status-approval_sent");
+                        pill.textContent = "APPROVAL SENT";
+                        showToast(
+                            "Checkout email sent",
+                            "Stripe pilot checkout link has been emailed to this brokerage."
+                        );
+                    } else if (status === "ACTIVE") {
+                        pill.classList.add("status-active");
+                        pill.textContent = "ACTIVE";
+                        showToast(
+                            "Pilot activated",
+                            "Stripe confirmed payment and this pilot is now active."
+                        );
+                    } else if (status === "REQUESTED") {
+                        pill.classList.add("status-requested");
+                        pill.textContent = "REQUESTED";
+                    }
+                }
+
+                btn.textContent = "Checkout Sent";
+
+                // Recompute KPIs after status change
+                recalculateMetrics();
             } catch (err) {
-              console.error("Error approving pilot:", err);
-              alert("Network error approving pilot.");
-            } finally {
-              btn.disabled = false;
-              btn.textContent = "Approve & Send Checkout";
+                console.error(err);
+                btn.disabled = false;
+                btn.textContent = originalLabel;
+                alert("There was a problem sending the checkout link. Please try again.");
             }
-          });
         });
-      }
+    }
 
-      refreshBtn.addEventListener("click", function () {
-        fetchPilots();
-      });
-
-      // Initial load
-      fetchPilots();
-    })();
-  </script>
+    // Soft auto-refresh: reload every 60s when tab is visible
+    const REFRESH_MS = 60000;
+    setInterval(() => {
+        if (!document.hidden) {
+            window.location.reload();
+        }
+    }, REFRESH_MS);
+});
+</script>
 </body>
 </html>

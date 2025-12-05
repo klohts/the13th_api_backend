@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     stripe_api_key: str
     # from .env: stripe_webhook_secret=...
     stripe_webhook_secret: str
+    stripe_pilot_price_id: str | None = None
 
     # Core DB
     # from .env: the13th_db_url=sqlite:///./data/the13th_allinone.db

@@ -14,7 +14,7 @@ from backend_v2.routers import api as api_router
 from backend_v2.routers import tenant as tenant_router
 from backend_v2.routers import client_experience_sim
 from backend_v2.api import pilot as pilot_api
-from backend_v2.routers import pilot_admin_ui
+import backend_v2.routers.pilot_admin_ui as pilot_admin_ui
 from backend_v2.services.render import STATIC_DIR
 
 logger = logging.getLogger("backend_v2.main")

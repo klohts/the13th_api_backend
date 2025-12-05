@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>THE13TH — Admin Pilot Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: radial-gradient(circle at top left, #4b0082, #05000b 60%);
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#05000b] text-slate-100 antialiased">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <!-- Header -->
+    <header class="flex items-center justify-between mb-6 sm:mb-8">
+      <div>
+        <div class="text-2xl font-extrabold tracking-tight">
+          <span class="text-purple-900">THE</span><span class="text-gray-50">13TH</span>
+        </div>
+        <p class="text-xs text-purple-200 mt-1">
+          Admin • Pilot Command Center
+        </p>
+      </div>
+      <div class="text-right text-xs text-slate-300">
+        <div class="font-semibold text-purple-100">Pilot Revenue Activation</div>
+        <div id="env-tag" class="inline-flex mt-1 rounded-full border border-purple-500/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-purple-100 bg-purple-900/40">
+          Admin View
+        </div>
+      </div>
+    </header>
+
+    <!-- Status & Controls -->
+    <section class="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div>
+        <h1 class="text-xl sm:text-2xl font-bold text-white mb-1">
+          Revenue Intelligence Pilot Requests
+        </h1>
+        <p class="text-xs text-slate-300 max-w-xl">
+          Review incoming brokerages, see fit at a glance, and trigger checkout in one click.
+        </p>
+      </div>
+      <div class="flex items-center gap-3 text-xs">
+        <button id="refresh-btn"
+                class="inline-flex items-center gap-1 rounded-full border border-purple-500/70 bg-purple-900/40 px-3 py-1 font-semibold text-purple-100 hover:bg-purple-800/70 transition">
+          <span>&#x21bb;</span>
+          <span>Refresh</span>
+        </button>
+        <span id="last-updated" class="text-[11px] text-slate-400"></span>
+      </div>
+    </section>
+
+    <!-- Filters / Legend -->
+    <section class="mb-4 sm:mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div class="flex flex-wrap items-center gap-2 text-[11px] text-slate-300">
+        <span class="uppercase tracking-wide text-slate-400">Legend:</span>
+        <span class="inline-flex items-center gap-1 rounded-full bg-slate-800/80 px-2 py-0.5">
+          <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+          <span>Requested</span>
+        </span>
+        <span class="inline-flex items-center gap-1 rounded-full bg-slate-800/80 px-2 py-0.5">
+          <span class="h-2 w-2 rounded-full bg-sky-400"></span>
+          <span>Approval Sent</span>
+        </span>
+        <span class="inline-flex items-center gap-1 rounded-full bg-slate-800/80 px-2 py-0.5">
+          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+          <span>Active</span>
+        </span>
+      </div>
+      <div class="text-[11px] text-slate-400">
+        Approve will call
+        <code class="px-1 rounded bg-slate-900/80 border border-slate-600/60 text-[10px]">POST /admin/pilots/&lt;id&gt;/approve</code>
+      </div>
+    </section>
+
+    <!-- Table wrapper -->
+    <section class="rounded-3xl border border-purple-700/40 bg-[#100016]/70 shadow-xl overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-left text-xs text-slate-200">
+          <thead class="bg-purple-950/70 border-b border-purple-800/50 text-[11px] uppercase tracking-wide text-slate-300">
+            <tr>
+              <th class="px-3 py-3">Brokerage</th>
+              <th class="px-3 py-3">Contact</th>
+              <th class="px-3 py-3">Role</th>
+              <th class="px-3 py-3 text-center">Agents</th>
+              <th class="px-3 py-3">Status</th>
+              <th class="px-3 py-3">Problem / Notes</th>
+              <th class="px-3 py-3 text-right">Requested</th>
+              <th class="px-3 py-3 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody id="pilot-rows" class="divide-y divide-purple-900/40 bg-[#080010]/80">
+            <!-- Rows inserted by JS -->
+          </tbody>
+        </table>
+      </div>
+      <div id="empty-state" class="hidden px-6 py-6 text-center text-xs text-slate-400">
+        No pilot requests yet. Once marketing starts sending traffic, they’ll show here.
+      </div>
+      <div id="error-state" class="hidden px-6 py-4 text-center text-xs text-rose-300 bg-rose-950/40 border-t border-rose-800/50">
+        There was a problem loading pilots. Check the API logs and refresh.
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      const API_BASE = window.location.origin;
+
+      const rowsEl = document.getElementById("pilot-rows");
+      const emptyStateEl = document.getElementById("empty-state");
+      const errorStateEl = document.getElementById("error-state");
+      const refreshBtn = document.getElementById("refresh-btn");
+      const lastUpdatedEl = document.getElementById("last-updated");
+
+      function formatDate(value) {
+        if (!value) return "";
+        try {
+          const d = new Date(value);
+          if (Number.isNaN(d.getTime())) return String(value);
+          return d.toLocaleString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+        } catch (e) {
+          return String(value);
+        }
+      }
+
+      function statusBadge(status) {
+        const s = (status || "").toString().toUpperCase();
+        let color = "bg-slate-700/80 text-slate-100 border-slate-500/60";
+        if (s.includes("REQUEST")) {
+          color = "bg-amber-900/70 text-amber-200 border-amber-500/70";
+        } else if (s.includes("APPROVAL")) {
+          color = "bg-sky-900/70 text-sky-200 border-sky-500/70";
+        } else if (s.includes("ACTIVE")) {
+          color = "bg-emerald-900/70 text-emerald-200 border-emerald-500/70";
+        } else if (s.includes("REJECT")) {
+          color = "bg-rose-900/70 text-rose-200 border-rose-500/70";
+        }
+        return '<span class="inline-flex items-center rounded-full border ' + color +
+               ' px-2 py-0.5 text-[10px] font-semibold tracking-wide">' + s + "</span>";
+      }
+
+      function escapeHtml(str) {
+        if (!str) return "";
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      function buildNotes(pilot) {
+        const parts = [];
+        if (pilot.notes) {
+          parts.push(pilot.notes);
+        }
+        if (pilot.lead_volume) {
+          parts.push("Lead volume: " + pilot.lead_volume);
+        }
+        return parts.join("\n\n");
+      }
+
+      function pilotRow(pilot) {
+        const id = pilot.id ?? pilot.pilot_id ?? pilot["id"];
+        const brokerage = pilot.brokerage_name || pilot.company || "";
+        const fullName = pilot.full_name || ((pilot.first_name || "") + " " + (pilot.last_name || "")).trim();
+        const email = pilot.email || "";
+        const role = pilot.role || "";
+        const agents = pilot.num_agents ?? pilot.team_size ?? "";
+        const created = pilot.created_at || pilot.created_ts || pilot.created || null;
+        const status = pilot.status || pilot.pilot_status || "REQUESTED";
+        const notes = buildNotes(pilot);
+
+        const canApprove = status.toString().toUpperCase().includes("REQUEST");
+
+        const approveBtn = canApprove
+          ? '<button data-pilot-id="' + id + '" class="approve-btn inline-flex items-center rounded-full bg-emerald-500/90 hover:bg-emerald-400 text-xs font-semibold text-slate-950 px-3 py-1 transition">Approve &amp; Send Checkout</button>'
+          : '<span class="text-[11px] text-slate-400">—</span>';
+
+        const niceNotes = escapeHtml(notes || "").replace(/\n/g, "<br />");
+
+        return `
+          <tr class="align-top">
+            <td class="px-3 py-3">
+              <div class="font-semibold text-xs text-white">${escapeHtml(brokerage || "—")}</div>
+            </td>
+            <td class="px-3 py-3">
+              <div class="text-xs text-slate-100">${escapeHtml(fullName || "—")}</div>
+              <div class="text-[11px] text-purple-200">${escapeHtml(email || "")}</div>
+            </td>
+            <td class="px-3 py-3 text-xs">${escapeHtml(role || "—")}</td>
+            <td class="px-3 py-3 text-center text-xs">
+              ${agents !== null && agents !== undefined && agents !== "" ? escapeHtml(String(agents)) : "—"}
+            </td>
+            <td class="px-3 py-3 text-xs">
+              ${statusBadge(status)}
+            </td>
+            <td class="px-3 py-3 text-[11px] text-slate-200">
+              ${niceNotes || "<span class='text-slate-500'>—</span>"}
+            </td>
+            <td class="px-3 py-3 text-right text-[11px] text-slate-300">
+              ${escapeHtml(formatDate(created))}
+            </td>
+            <td class="px-3 py-3 text-right">
+              ${approveBtn}
+            </td>
+          </tr>
+        `;
+      }
+
+      async function fetchPilots() {
+        errorStateEl.classList.add("hidden");
+        try {
+          const res = await fetch(API_BASE + "/admin/pilots/", {
+            headers: { "Accept": "application/json" },
+          });
+          if (!res.ok) {
+            console.error("Failed to fetch pilots:", res.status, await res.text());
+            throw new Error("Failed to fetch pilots");
+          }
+
+          const data = await res.json();
+          const pilots = Array.isArray(data) ? data : (data.items || data.results || []);
+
+          rowsEl.innerHTML = "";
+          if (!pilots || pilots.length === 0) {
+            emptyStateEl.classList.remove("hidden");
+          } else {
+            emptyStateEl.classList.add("hidden");
+            rowsEl.innerHTML = pilots.map(pilotRow).join("");
+          }
+
+          const now = new Date();
+          lastUpdatedEl.textContent = "Updated " + now.toLocaleTimeString();
+
+          attachApproveHandlers();
+        } catch (err) {
+          console.error("Error loading pilots:", err);
+          errorStateEl.classList.remove("hidden");
+        }
+      }
+
+      function attachApproveHandlers() {
+        const buttons = document.querySelectorAll(".approve-btn");
+        buttons.forEach((btn) => {
+          btn.addEventListener("click", async (event) => {
+            const pilotId = btn.getAttribute("data-pilot-id");
+            if (!pilotId) return;
+
+            const confirmMsg = "Approve this pilot and trigger checkout email?";
+            if (!window.confirm(confirmMsg)) return;
+
+            btn.disabled = true;
+            btn.textContent = "Approving…";
+
+            try {
+              const res = await fetch(API_BASE + "/admin/pilots/" + encodeURIComponent(pilotId) + "/approve", {
+                method: "POST",
+                headers: { "Accept": "application/json" },
+              });
+
+              if (!res.ok) {
+                const text = await res.text();
+                console.error("Approve failed:", res.status, text);
+                alert("Approve failed. Check API logs.");
+              } else {
+                await fetchPilots();
+              }
+            } catch (err) {
+              console.error("Error approving pilot:", err);
+              alert("Network error approving pilot.");
+            } finally {
+              btn.disabled = false;
+              btn.textContent = "Approve & Send Checkout";
+            }
+          });
+        });
+      }
+
+      refreshBtn.addEventListener("click", function () {
+        fetchPilots();
+      });
+
+      // Initial load
+      fetchPilots();
+    })();
+  </script>
+</body>
+</html>

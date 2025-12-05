@@ -280,6 +280,78 @@
       background: radial-gradient(circle at top left, #4b0082, #05000b 60%);
     }
   </style>
+
+    <!-- Cinematic Admin Pilot UI Override -->
+    <style id="pilot-admin-cinematic-override">
+      body {
+        font-size: 17px !important;
+        line-height: 1.6 !important;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 1rem !important;
+      }
+
+      thead {
+        background: linear-gradient(
+          to right,
+          rgba(0, 0, 0, 0.8),
+          rgba(20, 5, 30, 0.95)
+        ) !important;
+      }
+
+      th {
+        font-size: 0.95rem !important;
+        font-weight: 600 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 12px 18px !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+      }
+
+      td {
+        font-size: 1rem !important;
+        padding: 13px 18px !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+        vertical-align: middle !important;
+      }
+
+      tbody tr:last-child td {
+        border-bottom: none !important;
+      }
+
+      tbody tr {
+        transition: background 160ms ease-out, transform 160ms ease-out;
+      }
+
+      tbody tr:hover {
+        background: radial-gradient(
+          circle at left,
+          rgba(255, 144, 64, 0.16),
+          transparent 65%
+        ) !important;
+        transform: translateY(-1px);
+      }
+
+      .status-badge {
+        font-size: 0.9rem !important;
+        font-weight: 500 !important;
+        border-radius: 999px !important;
+        padding: 5px 11px !important;
+      }
+
+      .pilots-empty-state,
+      .empty-row td {
+        font-size: 1rem !important;
+        opacity: 0.95 !important;
+        text-align: center;
+        padding: 22px 18px !important;
+      }
+    </style>
+
 </head>
 <body class="min-h-screen bg-[#05000b] text-slate-100 antialiased">
   <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">

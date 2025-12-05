@@ -7,3 +7,6 @@ Exports the Lead table model.
 from .lead import Lead
 
 __all__ = ["Lead"]
+
+
+from .pilot import Pilot, PilotStatus  # noqa: F401

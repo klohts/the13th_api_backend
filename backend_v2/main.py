@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from backend_v2.routers import stripe_webhooks
-
 import logging
 
 from fastapi import FastAPI
@@ -69,9 +67,3 @@ def create_app() -> FastAPI:
 
 app = create_app()
 
-# Stripe webhooks
-app.include_router(
-    stripe_webhooks.router,
-    prefix="/stripe",
-    tags=["stripe"],
-)

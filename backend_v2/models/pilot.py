@@ -17,9 +17,12 @@ class PilotStatus(str, Enum):
 
 
 class PilotBase(SQLModel):
-    """Shared fields for Pilot."""
+    """Shared fields for Pilot requests."""
 
-    brokerage_name: str = Field(index=True, description="Brokerage / office name")
+    brokerage_name: str = Field(
+        index=True,
+        description="Brokerage / office name",
+    )
     contact_name: Optional[str] = Field(
         default=None,
         description="Primary contact name at the brokerage",
@@ -33,8 +36,7 @@ class PilotBase(SQLModel):
         description="Role of the contact (Owner, Broker, Ops Manager, etc.)",
     )
 
-    # In the template we reference `pilot.agents or pilot.agents_count`,
-    # so we store the true column as `agents_count`.
+    # Template references `pilot.agents or pilot.agents_count`
     agents_count: Optional[int] = Field(
         default=None,
         description="Approximate number of agents in this brokerage",
@@ -42,7 +44,7 @@ class PilotBase(SQLModel):
 
     problem_notes: Optional[str] = Field(
         default=None,
-        description="Free-text notes on their main bottlenecks / problems",
+        description="Free-text notes on main bottlenecks / problems",
     )
 
     status: PilotStatus = Field(
@@ -66,7 +68,15 @@ class PilotBase(SQLModel):
 
 
 class Pilot(PilotBase, table=True):
-    """Pilot request record for THE13TH paid pilot workflow."""
+    """
+    Pilot request record for THE13TH paid pilot workflow.
+
+    Uses a dedicated table name 'pilot_requests' to avoid clashing with any
+    existing 'pilot' table in the shared metadata.
+    """
+
+    __tablename__ = "pilot_requests"
+
     id: Optional[int] = Field(default=None, primary_key=True)
 
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from backend_v2.routers import pilot_admin, stripe_webhooks
+
 import logging
 
 from fastapi import FastAPI
@@ -21,13 +23,20 @@ logger = logging.getLogger("the13th.backend_v2.main")
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, debug=settings.debug)
 
+    origins = [
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+    "https://the13thhq.com",
+    "https://the13thhq-site.pages.dev",
+]
+
     app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.allowed_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 
     # Routers
     app.include_router(admin_router.router)
@@ -59,3 +68,17 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+# Pilot admin routes
+app.include_router(
+    pilot_admin.router,
+    prefix="/admin/pilots",
+    tags=["admin-pilots"],
+)
+
+# Stripe webhooks
+app.include_router(
+    stripe_webhooks.router,
+    prefix="/stripe",
+    tags=["stripe"],
+)

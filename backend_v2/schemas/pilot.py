@@ -59,6 +59,20 @@ class PilotRequest(BaseModel):
             v = "https://" + v
         return v
 
+    # 🔁 Backwards-compat for existing email code expecting `work_email`
+    @property
+    def work_email(self) -> EmailStr:
+        """
+        Alias for legacy code that expects `pilot.work_email`.
+        Uses the normalized contact_email field.
+        """
+        return self.contact_email
+
+
+# For compatibility with any internal naming using "PilotCreateFromLead"
+PilotCreateFromLead = PilotRequest
+
+
 class PilotAdminView(BaseModel):
     """
     Admin view of a pilot record.
@@ -71,6 +85,7 @@ class PilotAdminView(BaseModel):
     contact_name: str
     contact_email: EmailStr
     brokerage_name: str
+
     website: Optional[str]
 
     pilot_days: int

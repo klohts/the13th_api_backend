@@ -25,6 +25,7 @@ def create_app() -> FastAPI:
     "http://localhost:5000",
     "http://127.0.0.1:5000",
     "https://the13thhq.com",
+    "https://www.the13thhq.com",
     "https://the13thhq-site.pages.dev",
 ]
 

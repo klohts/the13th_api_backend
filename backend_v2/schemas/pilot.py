@@ -5,7 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
-from backend_v2.models.pilot import PilotStatus
+from backend_v2.models.pilot_model import PilotStatus
 
 
 class PilotRequest(BaseModel):

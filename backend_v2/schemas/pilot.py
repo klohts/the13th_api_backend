@@ -3,22 +3,61 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from backend_v2.models.pilot_model import PilotStatus
 
 
 class PilotRequest(BaseModel):
     """
-    Public-facing payload when a brokerage requests a pilot
-    (e.g., from landing/pilot.html).
+    Incoming payload from the marketing /pilot form.
+
+    Frontend sends:
+    - email
+    - full_name
+    - brokerage_name
+    - website
+    - role
+    - team_size
+    - lead_volume
+    - num_agents
+    - problem
+    - lead_context
+    - notes
+    - source
     """
 
-    contact_name: str = Field(..., max_length=255)
-    contact_email: EmailStr
-    brokerage_name: str = Field(..., max_length=255)
-    website: Optional[str] = Field(default=None, max_length=255)
-    pilot_days: int = Field(default=7, ge=1, le=30)
+    brokerage_name: str
+
+    # Frontend: "email"  -> internal: contact_email
+    contact_email: EmailStr = Field(alias="email")
+
+    # Frontend: "full_name" -> internal: contact_name
+    contact_name: str = Field(alias="full_name")
+
+    website: Optional[str] = None
+    role: Optional[str] = None
+
+    team_size: Optional[str] = None
+    lead_volume: Optional[str] = None
+    num_agents: Optional[int] = None
+    problem: Optional[str] = None
+    lead_context: Optional[str] = None
+    notes: Optional[str] = None
+    source: Optional[str] = None
+
+    @field_validator("website")
+    @classmethod
+    def normalize_website(cls, v: Optional[str]) -> Optional[str]:
+        """Make website optional + auto-add https:// when missing."""
+        if not v:
+            return v
+        v = v.strip()
+        if not v:
+            return None
+        if not v.startswith(("http://", "https://")):
+            v = "https://" + v
+        return v
 
 
 # For compatibility with any internal naming using "PilotCreateFromLead"

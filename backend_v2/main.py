@@ -23,6 +23,7 @@ from backend_v2.api import pilot as pilot_api
 
 # NEW: consolidated admin + webhook routers
 import backend_v2.routers.pilot_admin as pilot_admin_router
+import backend_v2.routers.pilot_request as pilot_request_router
 import backend_v2.routers.stripe_webhooks as stripe_webhooks_router
 
 from backend_v2.services.render import STATIC_DIR
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
 
     # Core routers
     app.include_router(admin_router.router)
+app.include_router(pilot_request_router.router)
     app.include_router(api_router.router)
     app.include_router(tenant_router.router)
     app.include_router(client_experience_sim.router)

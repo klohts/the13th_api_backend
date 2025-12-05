@@ -59,11 +59,6 @@ class PilotRequest(BaseModel):
             v = "https://" + v
         return v
 
-
-# For compatibility with any internal naming using "PilotCreateFromLead"
-PilotCreateFromLead = PilotRequest
-
-
 class PilotAdminView(BaseModel):
     """
     Admin view of a pilot record.

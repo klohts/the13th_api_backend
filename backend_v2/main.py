@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from backend_v2.routers import pilot_admin, stripe_webhooks
+from backend_v2.routers import stripe_webhooks
 
 import logging
 
@@ -68,13 +68,6 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-
-# Pilot admin routes
-app.include_router(
-    pilot_admin.router,
-    prefix="/admin/pilots",
-    tags=["admin-pilots"],
-)
 
 # Stripe webhooks
 app.include_router(

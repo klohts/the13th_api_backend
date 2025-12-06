@@ -23,13 +23,22 @@
     html.dark .text-muted { color:#d1d5db!important; }
     html.dark .text-soft { color:#9ca3af!important; }
 
+    body {
+      font-size: 14px;
+    }
+    @media (min-width: 1024px) {
+      body { font-size: 15px; }
+    }
+
     .hero-gradient {
       background: radial-gradient(circle at top left, #4b0082, #020617 60%);
     }
 
     /* Premium journey graph + replay styling (borrowed from admin sim) */
     .journey-shell {
-      @apply rounded-lg border border-gray-800 bg-black/40;
+      border-radius: 0.75rem;
+      border: 1px solid rgba(31,41,55,1);
+      background-color: rgba(0,0,0,0.4);
     }
 
     .journey-highlight {
@@ -101,6 +110,12 @@
         transform: none;
       }
     }
+
+    /* Make the journey chart truly fill its card */
+    #journeyChart {
+      width: 100% !important;
+      height: 100% !important;
+    }
   </style>
 </head>
 
@@ -158,7 +173,7 @@
             <p class="text-base font-semibold text-rose-50">
               {{ brokerage.agent_count }} agents
             </p>
-            <p class="text-[12px] text-purple-100/80">
+            <p class="text-[13px] text-purple-100/80 leading-relaxed">
               ~{{ brokerage.monthly_lead_volume }} inbound web / email leads each month.
             </p>
           </div>
@@ -169,7 +184,7 @@
             <p class="text-base font-semibold text-rose-50">
               {{ leads|length }} active leads
             </p>
-            <p class="text-[12px] text-purple-100/80">
+            <p class="text-[13px] text-purple-100/80 leading-relaxed">
               Including this month’s relocation buyer,
               <span class="font-medium">
                 {{ selected_lead.full_name if selected_lead else "Sarah Miller" }}.
@@ -192,13 +207,13 @@
               <p class="text-[11px] uppercase tracking-[0.18em] text-soft">
                 THE13TH · admin intelligence view
               </p>
-              <p class="text-[15px] md:text-base font-semibold text-main mt-1">
+              <p class="text-[15px] md:text-lg font-semibold text-main mt-1">
                 {{ brokerage.name }} — Owner console
               </p>
             </div>
 
             {% if selected_lead %}
-            <div class="flex flex-wrap items-center gap-3 text-[12px]">
+            <div class="flex flex-wrap items-center gap-3 text-[13px]">
               <div class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-700 bg-black/40">
                 <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
                 <span class="text-soft">
@@ -226,26 +241,26 @@
           </div>
 
           <!-- 30-day summary strip -->
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-[12px] text-soft fade-in-up fade-delay-2 revealed">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-[13px] text-soft fade-in-up fade-delay-2 revealed">
             <div class="rounded-md border border-gray-800 bg-black/40 px-3 py-2.5">
               <p class="text-[11px] uppercase tracking-wide text-soft">Touches · 30 days</p>
-              <p class="text-[16px] font-semibold text-main mt-0.5">38</p>
-              <p class="text-[11px] text-soft">Emails, calls, and nudges tracked for this lead.</p>
+              <p class="text-[17px] font-semibold text-main mt-0.5">38</p>
+              <p class="text-[12px] md:text-[13px] text-soft leading-relaxed">Emails, calls, and nudges tracked for this lead.</p>
             </div>
             <div class="rounded-md border border-gray-800 bg-black/40 px-3 py-2.5">
               <p class="text-[11px] uppercase tracking-wide text-soft">AI-admin actions</p>
-              <p class="text-[16px] font-semibold text-main mt-0.5">14</p>
-              <p class="text-[11px] text-soft">Drafts, summaries, alerts, and next-best actions.</p>
+              <p class="text-[17px] font-semibold text-main mt-0.5">14</p>
+              <p class="text-[12px] md:text-[13px] text-soft leading-relaxed">Drafts, summaries, alerts, and next-best actions.</p>
             </div>
             <div class="rounded-md border border-gray-800 bg-black/40 px-3 py-2.5">
               <p class="text-[11px] uppercase tracking-wide text-soft">Risk alerts surfaced</p>
-              <p class="text-[16px] font-semibold text-main mt-0.5">2</p>
-              <p class="text-[11px] text-soft">Moments where the deal was at risk of going cold.</p>
+              <p class="text-[17px] font-semibold text-main mt-0.5">2</p>
+              <p class="text-[12px] md:text-[13px] text-soft leading-relaxed">Moments where the deal was at risk of going cold.</p>
             </div>
             <div class="rounded-md border border-gray-800 bg-black/40 px-3 py-2.5">
               <p class="text-[11px] uppercase tracking-wide text-soft">Estimated commission</p>
-              <p class="text-[16px] font-semibold text-emerald-300 mt-0.5">$19.5k</p>
-              <p class="text-[11px] text-soft">Modeled from price, timeline, and engagement.</p>
+              <p class="text-[17px] font-semibold text-emerald-300 mt-0.5">$19.5k</p>
+              <p class="text-[12px] md:text-[13px] text-soft leading-relaxed">Modeled from price, timeline, and engagement.</p>
             </div>
           </div>
 
@@ -257,10 +272,10 @@
               <div class="rounded-lg border border-gray-800 bg-black/40 px-4 py-3.5">
                 <div class="flex items-start justify-between gap-2">
                   <div>
-                    <p class="text-[14px] font-semibold text-main">
+                    <p class="text-[15px] font-semibold text-main">
                       {{ brokerage.name }}
                     </p>
-                    <p class="text-[12px] text-soft mt-1 leading-relaxed">
+                    <p class="text-sm text-soft mt-1 leading-relaxed">
                       {{ brokerage.city }}, {{ brokerage.state }} ·
                       {{ brokerage.agent_count }} agents ·
                       ~{{ brokerage.monthly_lead_volume }} web / email leads per month.
@@ -270,12 +285,12 @@
                     <p class="text-[10px] uppercase tracking-wide text-soft">
                       Owner
                     </p>
-                    <p class="text-[12px] font-medium text-main">
+                    <p class="text-sm font-medium text-main">
                       {{ brokerage.owner_name }}
                     </p>
                   </div>
                 </div>
-                <p class="text-[12px] text-soft mt-2">
+                <p class="text-sm text-soft mt-2 leading-relaxed">
                   THE13TH sits on top of their existing systems, turning raw activity into
                   explainable, revenue-grade intelligence over a 30-day rolling window.
                 </p>
@@ -287,7 +302,7 @@
                   <p class="text-[11px] uppercase tracking-wide text-soft">
                     Live pipeline snapshot · 30 days
                   </p>
-                  <span class="text-[12px] text-soft">
+                  <span class="text-[13px] text-soft">
                     {{ leads|length }} active leads
                   </span>
                 </div>
@@ -303,7 +318,7 @@
                        {% endif %}">
                     <div class="flex items-start justify-between gap-3">
                       <div class="space-y-0.5">
-                        <p class="text-[13px] font-semibold text-main">
+                        <p class="text-[14px] font-semibold text-main">
                           {{ lead.full_name }}
                           {% if lead.is_primary_demo %}
                           <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-400/10 border border-emerald-400/40 text-[10px] text-emerald-300">
@@ -311,7 +326,7 @@
                           </span>
                           {% endif %}
                         </p>
-                        <p class="text-[12px] text-soft">
+                        <p class="text-sm text-soft">
                           {{ lead.city }} · $
                           {{ "{:,.0f}".format(lead.budget) }} · {{ lead.source }}
                         </p>
@@ -350,18 +365,18 @@
                     <p class="text-[11px] uppercase tracking-wide text-soft">
                       Lead profile · relocation buyer
                     </p>
-                    <p class="text-[15px] md:text-base font-semibold text-main">
+                    <p class="text-[15px] md:text-lg font-semibold text-main">
                       {{ selected_lead.full_name }}
-                      <span class="text-[13px] font-normal text-soft">
+                      <span class="text-[14px] font-normal text-soft">
                         — {{ selected_lead.city }} · $
                         {{ "{:,.0f}".format(selected_lead.budget) }}
                       </span>
                     </p>
-                    <p class="text-[12px] text-soft">
+                    <p class="text-sm text-soft leading-relaxed">
                       {{ selected_lead.notes }}
                     </p>
                   </div>
-                  <div class="grid grid-cols-2 gap-3 text-[12px] w-full md:w-auto">
+                  <div class="grid grid-cols-2 gap-3 text-[13px] w-full md:w-auto">
                     <div class="rounded-md border border-gray-700 bg-black/60 px-3 py-2.5">
                       <p class="text-soft mb-1 text-[11px]">
                         Intent score
@@ -369,7 +384,7 @@
                       <p class="text-[15px] font-semibold text-emerald-300">
                         {{ selected_lead.intent_score }}
                       </p>
-                      <p class="text-[11px] text-soft">
+                      <p class="text-[12px] text-soft leading-relaxed">
                         AI-assessed from content, source, and behavior.
                       </p>
                     </div>
@@ -380,7 +395,7 @@
                       <p class="text-[15px] font-semibold text-emerald-300">
                         {{ selected_lead.probability_to_close }}%
                       </p>
-                      <p class="text-[11px] text-soft">
+                      <p class="text-[12px] text-soft leading-relaxed">
                         Adjusted automatically as the 30-day journey unfolds.
                       </p>
                     </div>
@@ -396,7 +411,7 @@
                     <p class="text-[11px] uppercase tracking-wide text-soft">
                       30-day timeline · journey graph & feed
                     </p>
-                    <p class="text-[12px] text-soft mt-1 max-w-xl">
+                    <p class="text-sm text-soft mt-1 max-w-xl leading-relaxed">
                       Every touchpoint for this lead is captured, graphed, and explained — so the owner
                       can see where momentum builds, where risk spikes, and how THE13TH keeps the
                       conversation alive.
@@ -414,11 +429,11 @@
                     <p class="text-[11px] uppercase tracking-wide text-soft mb-1">
                       Journey curve
                     </p>
-                    <p class="text-[12px] text-soft mb-2">
+                    <p class="text-sm text-soft mb-2 leading-relaxed">
                       Each point is a touchpoint in this 30-day window: replies, nudges, questions, and key decision moments.
                     </p>
-                    <div class="h-48">
-                      <canvas id="journeyChart"></canvas>
+                    <div class="h-52 md:h-60 w-full">
+                      <canvas id="journeyChart" class="w-full h-full"></canvas>
                     </div>
                   </div>
                 </div>
@@ -484,7 +499,7 @@
                           {% endif %}">
                         <div class="flex flex-wrap items-baseline justify-between gap-2">
                           <div class="flex items-center gap-2">
-                            <p class="text-[14px] font-semibold text-main">
+                            <p class="text-[14px] md:text-[15px] font-semibold text-main">
                               {{ event.title }}
                             </p>
                             {% if event.event_type.value == "inquiry" %}
@@ -515,7 +530,7 @@
                             </span>
                           </div>
                         </div>
-                        <p class="text-[13px] text-main mt-1.5 leading-relaxed">
+                        <p class="text-sm text-main mt-1.5 leading-relaxed">
                           {{ event.description }}
                         </p>
                         <div class="mt-2 flex flex-wrap items-center gap-2">
@@ -541,14 +556,14 @@
                   {% endfor %}
                 </ol>
                 {% else %}
-                <p class="text-[12px] text-soft mt-2">
+                <p class="text-sm text-soft mt-2">
                   No events available for this lead in the demo universe.
                 </p>
                 {% endif %}
               </div>
               {% else %}
               <div class="rounded-lg border border-gray-800 bg-black/40 px-4 py-3.5">
-                <p class="text-[13px] text-main">
+                <p class="text-sm text-main">
                   No demo lead is currently available. Please ensure the demo world is initialized.
                 </p>
               </div>
@@ -559,8 +574,8 @@
       </div>
 
       <!-- FOOTER CTA -->
-      <div class="mt-7 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-[12px] text-soft">
-        <p>
+      <div class="mt-7 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-[13px] text-soft">
+        <p class="leading-relaxed">
           You’ve just seen <span class="font-medium text-main">one</span> 30-day journey in detail.
           In a live deployment, THE13TH runs this intelligence layer across every lead, every agent,
           every month.
@@ -619,6 +634,10 @@
           },
           options: {
             responsive: true,
+            maintainAspectRatio: false,
+            layout: {
+              padding: { left: 8, right: 8, top: 12, bottom: 8 }
+            },
             plugins: { legend: { display: false } },
             scales: {
               x: {

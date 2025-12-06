@@ -24,10 +24,18 @@ class Settings(BaseSettings):
     public_base_url: AnyHttpUrl
 
     # --------------------------------------------------
-    # Email / SMTP
+    # Email / SMTP / SendGrid
     # --------------------------------------------------
     # Env: EMAIL_FROM
     email_from: EmailStr
+
+    # Legacy compatibility: some code may use email_from_address
+    # Env: EMAIL_FROM_ADDRESS (optional; falls back to EMAIL_FROM)
+    email_from_address: Optional[EmailStr] = None
+
+    # Optional display name for from header
+    # Env: EMAIL_FROM_NAME
+    email_from_name: Optional[str] = None
 
     # Env: EMAIL_SMTP_USERNAME
     email_smtp_username: str
@@ -44,6 +52,10 @@ class Settings(BaseSettings):
     # Env: EMAIL_USE_TLS
     email_use_tls: bool = True
 
+    # Optional: direct SendGrid API usage
+    # Env: SENDGRID_API_KEY
+    sendgrid_api_key: Optional[str] = None
+
     # --------------------------------------------------
     # Auth / JWT
     # --------------------------------------------------
@@ -56,7 +68,7 @@ class Settings(BaseSettings):
     # --------------------------------------------------
     # Lead ingestion
     # --------------------------------------------------
-    # Raw env string, we parse it ourselves.
+    # Raw string from env; we parse into a list via property.
     # Env: INGESTION_API_KEYS
     ingestion_api_keys_raw: Optional[str] = None
 
@@ -87,7 +99,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=False,  # maps DATABASE_URL -> database_url, etc.
+        case_sensitive=False,  # DATABASE_URL -> database_url, SENDGRID_API_KEY -> sendgrid_api_key, etc.
         extra="ignore",
     )
 
@@ -111,13 +123,18 @@ class Settings(BaseSettings):
 
     def __init__(self, **values):
         super().__init__(**values)
+
+        # Backwards compatibility: if email_from_address not explicitly set,
+        # default it to email_from so email/config.py can rely on it.
+        if self.email_from_address is None:
+            self.email_from_address = self.email_from
+
         logger.info(
-            "Settings loaded (debug=%s, public_base_url=%s)", self.debug, self.public_base_url
+            "Settings loaded (debug=%s, public_base_url=%s)",
+            self.debug,
+            self.public_base_url,
         )
-        # Safe log for ingestion keys (only count, not the values)
-        logger.info(
-            "Ingestion API keys configured: %d", len(self.ingestion_api_keys)
-        )
+        logger.info("Ingestion API keys configured: %d", len(self.ingestion_api_keys))
 
 
 settings = Settings()

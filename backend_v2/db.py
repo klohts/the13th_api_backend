@@ -52,7 +52,7 @@ def _create_engine() -> Engine:
     """
     Create the global SQLAlchemy engine using the configured DATABASE_URL.
     """
-    raw_url: str = settings.database_url  # <-- lowercase attribute
+    raw_url: str = settings.database_url
     url: URL = _build_sqlalchemy_url(raw_url)
 
     try:
@@ -94,6 +94,20 @@ def get_db() -> Generator[Session, None, None]:
         raise
     finally:
         db.close()
+
+
+def get_session() -> Generator[Session, None, None]:
+    """
+    Backwards-compatible alias for FastAPI dependency usage.
+
+    Existing routers that do:
+        from backend_v2.db import get_session
+        ...
+        def endpoint(..., db: Session = Depends(get_session)):
+
+    will keep working.
+    """
+    yield from get_db()
 
 
 def init_db() -> None:

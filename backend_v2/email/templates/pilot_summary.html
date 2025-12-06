@@ -1,0 +1,160 @@
+<!-- backend_v2/email/templates/pilot_summary.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>THE13TH — 7-Day Pilot Summary</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+            background: #05000a;
+            color: #f9f5ff;
+        }
+        .shell {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 32px 20px 40px;
+            background: radial-gradient(circle at top left, #5b11a4 0, #0a0014 55%, #05000a 100%);
+        }
+        .card {
+            border-radius: 18px;
+            padding: 28px 24px 26px;
+            background: linear-gradient(135deg, rgba(9, 9, 18, 0.96), rgba(28, 6, 60, 0.96));
+            box-shadow: 0 28px 60px rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            margin-bottom: 12px;
+            color: rgba(241, 232, 255, 0.86);
+        }
+        h1 {
+            margin: 0 0 10px;
+            font-size: 22px;
+            color: #ffe4b5;
+        }
+        h2 {
+            margin: 0 0 18px;
+            font-size: 15px;
+            font-weight: 500;
+            color: rgba(249, 245, 255, 0.82);
+        }
+        p {
+            margin: 0 0 12px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: rgba(246, 238, 255, 0.9);
+        }
+        ul {
+            padding-left: 20px;
+            margin: 0 0 14px;
+        }
+        li {
+            font-size: 14px;
+            line-height: 1.6;
+            color: rgba(246, 238, 255, 0.9);
+            margin-bottom: 4px;
+        }
+        .section-title {
+            margin-top: 14px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255, 214, 102, 0.9);
+        }
+        .cta {
+            display: inline-block;
+            margin-top: 14px;
+            padding: 10px 20px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 500;
+            text-decoration: none;
+            color: #fff9f5;
+            background: radial-gradient(circle at top left, #b667ff, #6b21ff);
+        }
+        .meta {
+            margin-top: 20px;
+            font-size: 12px;
+            color: rgba(230, 220, 255, 0.78);
+        }
+        a {
+            color: #ffd666;
+        }
+    </style>
+</head>
+<body>
+<div class="shell">
+    <div class="card">
+        <div class="badge">Pilot · 7-Day Review</div>
+        <h1>Summary for {{ brokerage_name }}</h1>
+        <h2>Hi {{ first_name }}, your 7-day Revenue Intelligence Pilot has now completed.</h2>
+
+        <p>
+            Over the last week, THE13TH has been quietly watching lead flow and follow-up patterns
+            inside your brokerage so you can see exactly where revenue is being left on the table.
+        </p>
+
+        <div class="section-title">What this pilot told us</div>
+        <p>
+            In every brokerage we run, we consistently see the same patterns:
+        </p>
+        <ul>
+            <li>New online leads not being contacted within the first 5–15 minutes.</li>
+            <li>Follow-up sequences dropping off after the first or second touch.</li>
+            <li>Strong agents carrying most of the pipeline discipline for the whole team.</li>
+        </ul>
+
+        <p>
+            THE13TH exists to stabilize this — by making intelligent lead response and follow-up
+            a system, not a heroic individual effort.
+        </p>
+
+        <div class="section-title">Our recommendation</div>
+        <p>
+            Based on your pilot, our strong recommendation is to keep THE13TH running beyond this
+            first week so that:
+        </p>
+        <ul>
+            <li>Your intelligent first-touch and follow-up emails stay on for every new lead.</li>
+            <li>Owner-level visibility into response speed and leakage becomes permanent.</li>
+            <li>You can expand coverage from the pilot inbox/source to more of your lead flow.</li>
+        </ul>
+
+        <p>
+            To convert to a full subscription, simply reply to this email and we’ll move your
+            account into ongoing access.
+        </p>
+
+        <a href="mailto:{{ support_email }}" class="cta">
+            Reply &amp; Activate Full Access
+        </a>
+
+        <div class="section-title">Want to review the pilot live?</div>
+        <p>
+            If you’d like us to walk through the pilot with you (patterns, risks, and where THE13TH
+            is most valuable for {{ brokerage_name }}), reply to this email and we’ll schedule a
+            quick debrief call.
+        </p>
+
+        <p class="meta">
+            Thank you for trusting THE13TH with your pipeline.
+            <br /><br />
+            — THE13TH Pilot Desk<br />
+            <a href="mailto:{{ support_email }}">{{ support_email }}</a>
+        </p>
+    </div>
+</div>
+</body>
+</html>

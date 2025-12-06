@@ -179,7 +179,7 @@ def send_pilot_checkout_email(
     )
 
     plain_text_fallback = (
-        f"Hi there,\n\n"
+        "Hi there,\n\n"
         "Your 7-day Revenue Intelligence Pilot with THE13TH has been approved.\n\n"
         "To activate your pilot, please complete your setup using this secure link:\n"
         f"{checkout_url}\n\n"
@@ -198,6 +198,82 @@ def send_pilot_checkout_email(
         to_email=to_email,
         subject=PILOT_CHECKOUT_SUBJECT,
         template_name=PILOT_CHECKOUT_TEMPLATE_NAME,
+        context=context,
+        plain_text_fallback=plain_text_fallback,
+    )
+
+
+# === 7-Day pilot summary + recommendation email (end of pilot) ===
+
+PILOT_SUMMARY_TEMPLATE_NAME = "pilot_summary.html"
+PILOT_SUMMARY_SUBJECT = "Your 7-Day Pilot Summary & Recommendation — THE13TH"
+
+
+def build_pilot_summary_context(
+    *,
+    full_name: str,
+    brokerage_name: str,
+) -> Dict[str, Any]:
+    """
+    Minimal context for the 7-day summary email.
+
+    Metrics can be added later (lead counts, response speed, etc.).
+    """
+    full_name_clean = (full_name or "").strip()
+    first_name = full_name_clean.split(" ", 1)[0] if full_name_clean else "there"
+
+    return {
+        "full_name": full_name_clean or first_name,
+        "first_name": first_name,
+        "brokerage_name": brokerage_name or "your brokerage",
+        "support_email": str(settings.email_from_address),
+        # Extend later with real metrics:
+        # "total_leads": metrics.total_leads,
+        # "avg_response_minutes": metrics.avg_response_minutes,
+        # etc.
+    }
+
+
+def send_pilot_summary_email(
+    *,
+    to_email: EmailStr,
+    full_name: str,
+    brokerage_name: str,
+) -> None:
+    """
+    Send the 7-day pilot summary + recommendation email.
+
+    Call this from a scheduled job that runs ~7 days after activation.
+    """
+    context = build_pilot_summary_context(
+        full_name=full_name,
+        brokerage_name=brokerage_name,
+    )
+
+    plain_text_fallback = (
+        f"Hi {context['first_name']},\n\n"
+        "Your 7-day Revenue Intelligence Pilot with THE13TH has now completed.\n\n"
+        "Over the last week, THE13TH has been monitoring lead flow and follow-up patterns "
+        "so you can see where revenue is being left on the table.\n\n"
+        "Recommendation:\n"
+        "Our strong recommendation is to keep THE13TH running beyond the pilot so that email "
+        "intelligence and response discipline become a permanent part of how your brokerage operates.\n\n"
+        "To move into a full subscription, simply reply to this email and we’ll convert your account "
+        "to ongoing access.\n\n"
+        "If you’d like to review the pilot together, reply and we’ll schedule a quick call.\n\n"
+        "– THE13TH Pilot Desk"
+    )
+
+    logger.info(
+        "Sending 7-day pilot summary email to %s for brokerage=%s",
+        to_email,
+        brokerage_name,
+    )
+
+    email_client.send_html_email(
+        to_email=to_email,
+        subject=PILOT_SUMMARY_SUBJECT,
+        template_name=PILOT_SUMMARY_TEMPLATE_NAME,
         context=context,
         plain_text_fallback=plain_text_fallback,
     )

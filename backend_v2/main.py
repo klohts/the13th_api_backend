@@ -18,8 +18,10 @@ from backend_v2.db import init_db
 from backend_v2.routers import admin as admin_router
 from backend_v2.routers import api as api_router
 from backend_v2.routers import tenant as tenant_router
+
 from backend_v2.routers import client_experience_sim
 from backend_v2.api import pilot as pilot_api
+from backend_v2.routers import ingestion as ingestion_router
 
 # NEW: consolidated admin + webhook routers
 import backend_v2.routers.pilot_admin as pilot_admin_router
@@ -66,6 +68,11 @@ def create_app() -> FastAPI:
 
     # Stripe webhook to activate pilots / sync payments
     app.include_router(stripe_webhooks_router.router)
+
+    # Ingestion router for leads, etc.
+    app.include_router(ingestion_router.router)
+    # or, if you use a global API prefix:
+    # app.include_router(ingestion_router.router, prefix="/api")
 
     # Static files
     STATIC_DIR.mkdir(parents=True, exist_ok=True)

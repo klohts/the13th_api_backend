@@ -55,23 +55,60 @@ def _first_non_empty(*values: Any) -> Optional[str]:
     return None
 
 
+def _load_raw_settings() -> Optional[Any]:
+    """
+    Try multiple ways to get a settings object from backend_v2.email.config:
+
+    - email_settings attribute (preferred)
+    - get_email_settings() function
+    - EmailSettings() class constructor
+
+    If all fail, returns None and we'll fall back to env-only.
+    """
+    raw = getattr(email_config, "email_settings", None)
+    if raw is not None:
+        return raw
+
+    getter = getattr(email_config, "get_email_settings", None)
+    if callable(getter):
+        try:
+            raw = getter()
+            if raw is not None:
+                logger.info("Loaded email settings via get_email_settings()")
+                return raw
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "Error calling email_config.get_email_settings(): %s",
+                exc,
+                exc_info=True,
+            )
+
+    cls = getattr(email_config, "EmailSettings", None)
+    if isinstance(cls, type):
+        try:
+            raw = cls()
+            logger.info("Instantiated email settings via EmailSettings()")
+            return raw
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "Error instantiating email_config.EmailSettings(): %s",
+                exc,
+                exc_info=True,
+            )
+
+    return None
+
+
 def _get_settings() -> Optional[EmailSettingsCompat]:
     """
     Load email settings from backend_v2.email.config, with env fallbacks.
 
-    Tries multiple common field names so we don't depend on the exact config
-    implementation.
+    Even if the config module doesn't expose email_settings, this will still
+    try environment variables so we don't hard-fail.
     """
-    raw = getattr(email_config, "email_settings", None)
+    raw = _load_raw_settings()
 
-    if raw is None:
-        logger.error(
-            "backend_v2.email.config.email_settings is not initialised; "
-            "emails will be skipped."
-        )
-        return None
-
-    # Try a few likely names for the SendGrid API key
+    # These getattr() calls are safe even if raw is None.
     sendgrid_api_key = _first_non_empty(
         getattr(raw, "sendgrid_api_key", None),
         getattr(raw, "SENDGRID_API_KEY", None),
@@ -80,7 +117,6 @@ def _get_settings() -> Optional[EmailSettingsCompat]:
         os.getenv("EMAIL_SENDGRID_API_KEY"),
     )
 
-    # From email / name
     from_email = _first_non_empty(
         getattr(raw, "from_email", None),
         getattr(raw, "EMAIL_FROM", None),
@@ -105,8 +141,12 @@ def _get_settings() -> Optional[EmailSettingsCompat]:
         logger.error(
             "Email settings incomplete (SendGrid API key or from_email missing); "
             "emails will be skipped. "
-            "Fields on email_settings=%s",
-            [attr for attr in dir(raw) if not attr.startswith("_")],
+            "raw_settings_present=%s env_keys=%s",
+            bool(raw),
+            {
+                "SENDGRID_API_KEY": bool(os.getenv("SENDGRID_API_KEY")),
+                "EMAIL_FROM": bool(os.getenv("EMAIL_FROM")),
+            },
         )
         return None
 

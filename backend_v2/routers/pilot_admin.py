@@ -138,8 +138,8 @@ def approve_pilot(
             detail="Pilot does not have a contact email configured.",
         )
 
-    # Build success / cancel URLs from PUBLIC_BASE_URL
-    public_base = settings.public_base_url.rstrip("/")
+    # Build success / cancel URLs from PUBLIC_BASE_URL (AnyHttpUrl -> str)
+    public_base = str(settings.public_base_url).rstrip("/")
     success_url = f"{public_base}/thankyou?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{public_base}/pilot"
 
@@ -169,7 +169,6 @@ def approve_pilot(
             pilot.id,
             exc,
         )
-        # Still return 500 so the UI shows the correct error
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to create Stripe checkout",

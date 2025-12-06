@@ -1,43 +1,77 @@
-from __future__ import annotations
-
 import logging
 from typing import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session, sessionmaker
-from sqlmodel import SQLModel
+from sqlalchemy.engine.url import URL, make_url
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 from backend_v2.config import settings
 
 logger = logging.getLogger("the13th.backend_v2.db")
 
+Base = declarative_base()
+
+
+def _build_sqlalchemy_url(raw_url: str) -> URL:
+    """
+    Validate and parse the DATABASE_URL string into a SQLAlchemy URL.
+    Raises a RuntimeError with a clear message if invalid.
+    """
+    if not raw_url or not raw_url.strip():
+        msg = (
+            "DATABASE_URL is empty or not set. "
+            "Set DATABASE_URL in your environment or .env file, e.g.:\n"
+            "  DATABASE_URL=sqlite:///./the13th.db\n"
+            "or a Postgres URL, e.g.:\n"
+            "  DATABASE_URL=postgresql+psycopg2://user:pass@host:5432/dbname"
+        )
+        logger.error(msg)
+        raise RuntimeError(msg)
+
+    try:
+        url = make_url(raw_url)
+    except Exception as exc:
+        msg = (
+            f"Invalid DATABASE_URL '{raw_url}'. "
+            "Expected a valid SQLAlchemy URL such as:\n"
+            "  sqlite:///./the13th.db\n"
+            "  postgresql+psycopg2://user:pass@host:5432/dbname"
+        )
+        logger.error(msg)
+        raise RuntimeError(msg) from exc
+
+    # Log a safe version without credentials
+    safe_url = url.set(password="***") if url.password else url
+    logger.info("Using DATABASE_URL=%s", safe_url)
+    return url
+
 
 def _create_engine() -> Engine:
     """
-    Create the SQLAlchemy engine based on DATABASE_URL.
-    Handles SQLite vs non-SQLite differences.
+    Create the global SQLAlchemy engine using the configured DATABASE_URL.
     """
-    database_url = settings.database_url
-    connect_args = {}
+    raw_url: str = settings.database_url  # <-- lowercase attribute
+    url: URL = _build_sqlalchemy_url(raw_url)
 
-    if database_url.startswith("sqlite"):
-        # Needed for SQLite when used in multi-threaded FastAPI context
-        connect_args["check_same_thread"] = False
+    try:
+        engine = create_engine(
+            url,
+            echo=False,
+            future=True,
+            pool_pre_ping=True,
+        )
+    except SQLAlchemyError:
+        logger.exception("Failed to create database engine for %s", url)
+        raise
 
-    engine = create_engine(
-        database_url,
-        echo=settings.debug,
-        future=True,
-        connect_args=connect_args,
-    )
-    logger.info("Database engine created for %s", database_url)
+    logger.info("Database engine created for %s", url)
     return engine
 
 
 engine: Engine = _create_engine()
 
-# Session factory
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
@@ -46,44 +80,32 @@ SessionLocal = sessionmaker(
 )
 
 
-def get_session() -> Generator[Session, None, None]:
+def get_db() -> Generator[Session, None, None]:
     """
-    FastAPI dependency that yields a database session and
-    makes sure it is closed afterwards.
+    FastAPI dependency that yields a database session and ensures it is closed.
     """
     db: Session = SessionLocal()
     try:
         yield db
+        db.commit()
+    except Exception:
+        logger.exception("Error during DB session; rolling back.")
+        db.rollback()
+        raise
     finally:
         db.close()
 
 
-# Alias used by some routers
-get_db = get_session
-
-# Backwards-compatible Base alias; models can inherit from this if needed.
-Base = SQLModel
-
-
 def init_db() -> None:
     """
-    Import all model modules and create tables.
-
-    Uses SQLModel.metadata so all SQLModel-based tables
-    (Lead, Pilot, etc.) are created in the same metadata.
+    Initialize the database by creating all tables.
+    Import models inside the function to avoid circular imports.
     """
-    import backend_v2.models  # noqa: F401  # ensures models are imported
+    import backend_v2.models  # noqa: F401
 
-    logger.info("Ensuring database tables exist via SQLModel.metadata.create_all()")
-    SQLModel.metadata.create_all(bind=engine)
-    logger.info("Database tables ensured.")
-
-
-__all__ = [
-    "Base",
-    "engine",
-    "SessionLocal",
-    "get_db",
-    "get_session",
-    "init_db",
-]
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created/verified successfully.")
+    except SQLAlchemyError:
+        logger.exception("Failed to initialize database schema.")
+        raise

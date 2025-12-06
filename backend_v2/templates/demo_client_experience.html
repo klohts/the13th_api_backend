@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>THE13TH · Demo Experience · 30-Day Lead Journey</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' };
+  </script>
+
+  <!-- Chart.js for journey graph -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    /* Shared tokens, matching index.html */
+    .bg-surface { background-color:#020617!important; }
+    html.dark .bg-card { background-color:#020617!important; }
+    html.dark .border-surface { border-color:#1f2937!important; }
+    html.dark .text-main { color:#f9fafb!important; }
+    html.dark .text-muted { color:#d1d5db!important; }
+    html.dark .text-soft { color:#9ca3af!important; }
+
+    .hero-gradient {
+      background: radial-gradient(circle at top left, #4b0082, #020617 60%);
+    }
+
+    /* Premium journey graph + replay styling (borrowed from admin sim) */
+    .journey-shell {
+      @apply rounded-lg border border-gray-800 bg-black/40;
+    }
+
+    .journey-highlight {
+      background-color: rgba(168,85,247,0.16) !important;
+      border-color: rgba(168,85,247,0.8) !important;
+      box-shadow: 0 0 0 1px rgba(168,85,247,0.55);
+    }
+
+    .replay-bar-wrapper {
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(148,163,184,0.25);
+      overflow: hidden;
+    }
+
+    .replay-bar-inner {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(to right, #a855f7, #ec4899);
+      transition: width 0.18s linear;
+    }
+
+    .btn-replay-primary {
+      background: #faf5ff;
+      color: #4c1d95;
+      font-weight: 700;
+      padding: 0.6rem 1.25rem;
+      border-radius: 999px;
+      border: 1px solid rgba(76, 29, 149, 0.25);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+      font-size: 0.78rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition:
+        background 0.22s ease,
+        box-shadow 0.22s ease,
+        transform 0.16s ease;
+    }
+
+    .btn-replay-primary:hover {
+      background: #f3e8ff;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+      transform: translateY(-1px);
+    }
+
+    .fade-in-up {
+      opacity: 0;
+      transform: translateY(10px);
+      transition:
+        opacity 0.55s ease-out,
+        transform 0.55s ease-out;
+    }
+
+    .fade-in-up.revealed {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .fade-delay-1 { transition-delay: 80ms; }
+    .fade-delay-2 { transition-delay: 140ms; }
+    .fade-delay-3 { transition-delay: 200ms; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .fade-in-up {
+        opacity: 1;
+        transform: none;
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-surface text-main antialiased">
+  <!-- NAV (logo exactly as index.html) -->
+  <header class="bg-card dark:bg-[#020617] border-b border-surface dark:border-gray-800">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <!-- THE13TH logo (exact style) -->
+      <a href="/" class="text-2xl font-extrabold tracking-tight">
+        <span class="text-purple-900 dark:text-purple-300">THE</span><span class="text-gray-900 dark:text-gray-50">13TH</span>
+      </a>
+
+      <div class="flex items-center gap-4 text-[13px]">
+        <span class="hidden md:inline-flex items-center gap-1.5 text-emerald-300">
+          <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          Live demo environment
+        </span>
+        <a href="/pilot"
+           class="inline-flex items-center gap-2 rounded-full border border-pink-400/70 bg-pink-500/10 px-4 py-2 text-[12px] font-semibold text-pink-50 hover:bg-pink-500/20 transition">
+          Request Pilot Access
+          <span class="text-sm">→</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero-gradient border-b border-surface/70">
+    <div class="max-w-6xl mx-auto px-6 py-10 lg:py-12">
+      <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8">
+        <div class="space-y-4 max-w-2xl fade-in-up revealed">
+          <p class="inline-flex items-center gap-2 rounded-full border border-purple-300/40 bg-black/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-purple-100/90">
+            Client console · demo playback
+            <span class="h-1 w-1 rounded-full bg-emerald-300"></span>
+          </p>
+          <h1 class="text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight text-rose-50 leading-tight">
+            A real 30-day lead journey
+            <span class="block text-rose-100/80">
+              inside a modern brokerage.
+            </span>
+          </h1>
+          <p class="text-[15px] md:text-base text-purple-100/90 leading-relaxed">
+            This is how <span class="font-semibold">{{ brokerage.name }}</span> in
+            {{ brokerage.city }}, {{ brokerage.state }} sees its pipeline with THE13TH:
+            live lead intelligence, admin automation, and revenue-grade visibility —
+            over a rolling 30-day window.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 text-[13px] fade-in-up fade-delay-1 revealed">
+          <div class="rounded-xl border border-purple-200/50 bg-white/5 px-4 py-3 shadow-md shadow-purple-900/40">
+            <p class="text-[11px] uppercase tracking-[0.16em] text-purple-100/80 mb-1">
+              Brokerage footprint
+            </p>
+            <p class="text-base font-semibold text-rose-50">
+              {{ brokerage.agent_count }} agents
+            </p>
+            <p class="text-[12px] text-purple-100/80">
+              ~{{ brokerage.monthly_lead_volume }} inbound web / email leads each month.
+            </p>
+          </div>
+          <div class="rounded-xl border border-purple-200/50 bg-white/5 px-4 py-3 shadow-md shadow-purple-900/40">
+            <p class="text-[11px] uppercase tracking-[0.16em] text-purple-100/80 mb-1">
+              30-day live snapshot
+            </p>
+            <p class="text-base font-semibold text-rose-50">
+              {{ leads|length }} active leads
+            </p>
+            <p class="text-[12px] text-purple-100/80">
+              Including this month’s relocation buyer,
+              <span class="font-medium">
+                {{ selected_lead.full_name if selected_lead else "Sarah Miller" }}.
+              </span>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MAIN FRAME -->
+  <main class="py-8 lg:py-10 bg-surface">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="rounded-xl border border-gray-700 bg-[#020617]">
+        <div class="p-5 md:p-7 space-y-6">
+          <!-- header inside frame -->
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 fade-in-up fade-delay-1 revealed">
+            <div>
+              <p class="text-[11px] uppercase tracking-[0.18em] text-soft">
+                THE13TH · admin intelligence view
+              </p>
+              <p class="text-[15px] md:text-base font-semibold text-main mt-1">
+                {{ brokerage.name }} — Owner console
+              </p>
+            </div>
+
+            {% if selected_lead %}
+            <div class="flex flex-wrap items-center gap-3 text-[12px]">
+              <div class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-700 bg-black/40">
+                <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                <span class="text-soft">
+                  Tracking lead:
+                  <span class="font-semibold text-main">{{ selected_lead.full_name }}</span>
+                </span>
+              </div>
+              <div class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-700 bg-black/40">
+                <span class="text-soft">Stage</span>
+                <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px]
+                  {% if selected_lead.stage.value == 'decision_window' %}
+                    border-amber-400/80 bg-amber-400/10 text-amber-100
+                  {% elif selected_lead.stage.value == 'active_search' %}
+                    border-sky-400/80 bg-sky-400/10 text-sky-100
+                  {% elif selected_lead.stage.value == 'engaged' %}
+                    border-emerald-400/80 bg-emerald-400/10 text-emerald-100
+                  {% else %}
+                    border-gray-600 bg-black/60 text-main
+                  {% endif %}">
+                  {{ selected_lead.stage.name.replace("_", " ") | title }}
+                </span>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+
+          <!-- 30-day summary strip -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-[12px] text-soft fade-in-up fade-delay-2 revealed">
+            <div class="rounded-md border border-gray-800 bg-black/40 px-3 py-2.5">
+              <p class="text-[11px] uppercase tracking-wide text-soft">Touches · 30 days</p>
+              <p class="text-[16px] font-semibold text-main mt-0.5">38</p>
+              <p class="text-[11px] text-soft">Emails, calls, and nudges tracked for this lead.</p>
+            </div>
+            <div class="rounded-md border border-gray-800 bg-black/40 px-3 py-2.5">
+              <p class="text-[11px] uppercase tracking-wide text-soft">AI-admin actions</p>
+              <p class="text-[16px] font-semibold text-main mt-0.5">14</p>
+              <p class="text-[11px] text-soft">Drafts, summaries, alerts, and next-best actions.</p>
+            </div>
+            <div class="rounded-md border border-gray-800 bg-black/40 px-3 py-2.5">
+              <p class="text-[11px] uppercase tracking-wide text-soft">Risk alerts surfaced</p>
+              <p class="text-[16px] font-semibold text-main mt-0.5">2</p>
+              <p class="text-[11px] text-soft">Moments where the deal was at risk of going cold.</p>
+            </div>
+            <div class="rounded-md border border-gray-800 bg-black/40 px-3 py-2.5">
+              <p class="text-[11px] uppercase tracking-wide text-soft">Estimated commission</p>
+              <p class="text-[16px] font-semibold text-emerald-300 mt-0.5">$19.5k</p>
+              <p class="text-[11px] text-soft">Modeled from price, timeline, and engagement.</p>
+            </div>
+          </div>
+
+          <!-- grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 fade-in-up fade-delay-3 revealed">
+            <!-- LEFT -->
+            <section class="lg:col-span-1 space-y-4">
+              <!-- brokerage summary -->
+              <div class="rounded-lg border border-gray-800 bg-black/40 px-4 py-3.5">
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <p class="text-[14px] font-semibold text-main">
+                      {{ brokerage.name }}
+                    </p>
+                    <p class="text-[12px] text-soft mt-1 leading-relaxed">
+                      {{ brokerage.city }}, {{ brokerage.state }} ·
+                      {{ brokerage.agent_count }} agents ·
+                      ~{{ brokerage.monthly_lead_volume }} web / email leads per month.
+                    </p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-[10px] uppercase tracking-wide text-soft">
+                      Owner
+                    </p>
+                    <p class="text-[12px] font-medium text-main">
+                      {{ brokerage.owner_name }}
+                    </p>
+                  </div>
+                </div>
+                <p class="text-[12px] text-soft mt-2">
+                  THE13TH sits on top of their existing systems, turning raw activity into
+                  explainable, revenue-grade intelligence over a 30-day rolling window.
+                </p>
+              </div>
+
+              <!-- lead list -->
+              <div class="rounded-lg border border-gray-800 bg-black/40 px-3.5 py-3.5">
+                <div class="flex items-center justify-between mb-2.5">
+                  <p class="text-[11px] uppercase tracking-wide text-soft">
+                    Live pipeline snapshot · 30 days
+                  </p>
+                  <span class="text-[12px] text-soft">
+                    {{ leads|length }} active leads
+                  </span>
+                </div>
+                <div class="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                  {% for lead in leads %}
+                  {% set is_selected = selected_lead and lead.id == selected_lead.id %}
+                  <a href="/demo-experience?lead_id={{ lead.id }}"
+                     class="block rounded-md border px-3 py-2.5 transition
+                       {% if is_selected %}
+                         border-pink-400/80 bg-pink-500/10
+                       {% else %}
+                         border-gray-800 hover:border-gray-600 hover:bg-black/50
+                       {% endif %}">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="space-y-0.5">
+                        <p class="text-[13px] font-semibold text-main">
+                          {{ lead.full_name }}
+                          {% if lead.is_primary_demo %}
+                          <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-400/10 border border-emerald-400/40 text-[10px] text-emerald-300">
+                            Primary demo
+                          </span>
+                          {% endif %}
+                        </p>
+                        <p class="text-[12px] text-soft">
+                          {{ lead.city }} · $
+                          {{ "{:,.0f}".format(lead.budget) }} · {{ lead.source }}
+                        </p>
+                      </div>
+                      <div class="text-right space-y-1">
+                        <span class="inline-flex items-center rounded-full border px-1.5 py-0.5 text-[11px]
+                          {% if lead.stage.value == 'decision_window' %}
+                            border-amber-400/70 bg-amber-400/10 text-amber-100
+                          {% elif lead.stage.value == 'active_search' %}
+                            border-sky-400/70 bg-sky-400/10 text-sky-100
+                          {% elif lead.stage.value == 'engaged' %}
+                            border-emerald-400/70 bg-emerald-400/10 text-emerald-100
+                          {% else %}
+                            border-gray-600 bg-black/60 text-main
+                          {% endif %}">
+                          {{ lead.stage.name.replace("_", " ") | title }}
+                        </span>
+                        <p class="text-[11px] text-soft">
+                          Intent {{ lead.intent_score }} · Close {{ lead.probability_to_close }}%
+                        </p>
+                      </div>
+                    </div>
+                  </a>
+                  {% endfor %}
+                </div>
+              </div>
+            </section>
+
+            <!-- RIGHT -->
+            <section class="lg:col-span-2 space-y-4">
+              {% if selected_lead %}
+              <!-- lead summary -->
+              <div class="rounded-lg border border-gray-800 bg-black/40 px-4 py-3.5">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div class="space-y-1">
+                    <p class="text-[11px] uppercase tracking-wide text-soft">
+                      Lead profile · relocation buyer
+                    </p>
+                    <p class="text-[15px] md:text-base font-semibold text-main">
+                      {{ selected_lead.full_name }}
+                      <span class="text-[13px] font-normal text-soft">
+                        — {{ selected_lead.city }} · $
+                        {{ "{:,.0f}".format(selected_lead.budget) }}
+                      </span>
+                    </p>
+                    <p class="text-[12px] text-soft">
+                      {{ selected_lead.notes }}
+                    </p>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3 text-[12px] w-full md:w-auto">
+                    <div class="rounded-md border border-gray-700 bg-black/60 px-3 py-2.5">
+                      <p class="text-soft mb-1 text-[11px]">
+                        Intent score
+                      </p>
+                      <p class="text-[15px] font-semibold text-emerald-300">
+                        {{ selected_lead.intent_score }}
+                      </p>
+                      <p class="text-[11px] text-soft">
+                        AI-assessed from content, source, and behavior.
+                      </p>
+                    </div>
+                    <div class="rounded-md border border-gray-700 bg-black/60 px-3 py-2.5">
+                      <p class="text-soft mb-1 text-[11px]">
+                        Close probability
+                      </p>
+                      <p class="text-[15px] font-semibold text-emerald-300">
+                        {{ selected_lead.probability_to_close }}%
+                      </p>
+                      <p class="text-[11px] text-soft">
+                        Adjusted automatically as the 30-day journey unfolds.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- journey graph + timeline (cinematic admin-sim style) -->
+              <div class="journey-shell px-4 py-4">
+                <!-- Header -->
+                <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-3">
+                  <div>
+                    <p class="text-[11px] uppercase tracking-wide text-soft">
+                      30-day timeline · journey graph & feed
+                    </p>
+                    <p class="text-[12px] text-soft mt-1 max-w-xl">
+                      Every touchpoint for this lead is captured, graphed, and explained — so the owner
+                      can see where momentum builds, where risk spikes, and how THE13TH keeps the
+                      conversation alive.
+                    </p>
+                  </div>
+                  <div class="text-[11px] text-soft flex flex-col items-start md:items-end gap-1">
+                    <span>Events in context: {{ timeline|length if timeline else 0 }}</span>
+                    <span>Window: 30 days · Demo universe</span>
+                  </div>
+                </div>
+
+                <!-- Graph -->
+                <div class="mb-4">
+                  <div class="rounded-lg border border-gray-800 bg-gradient-to-br from-purple-900/40 via-black/60 to-slate-900/80 px-3 py-3">
+                    <p class="text-[11px] uppercase tracking-wide text-soft mb-1">
+                      Journey curve
+                    </p>
+                    <p class="text-[12px] text-soft mb-2">
+                      Each point is a touchpoint in this 30-day window: replies, nudges, questions, and key decision moments.
+                    </p>
+                    <div class="h-48">
+                      <canvas id="journeyChart"></canvas>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Replay controls -->
+                <div class="mb-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div class="flex items-center gap-3">
+                    <button
+                      type="button"
+                      id="replayJourney"
+                      class="btn-replay-primary"
+                    >
+                      <span>Replay this journey</span>
+                      <span class="text-xs">▶</span>
+                    </button>
+                    <p id="replayStatus" class="text-[11px] text-soft">
+                      Ready to replay this simulated journey.
+                    </p>
+                  </div>
+                  <div class="w-full md:w-64">
+                    <div class="replay-bar-wrapper">
+                      <div id="replayProgress" class="replay-bar-inner"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Legend -->
+                <div class="flex flex-wrap items-center gap-3 mb-3 text-[11px] text-soft">
+                  <div class="inline-flex items-center gap-1.5">
+                    <span class="h-2 w-2 rounded-full bg-emerald-400/80"></span>
+                    <span>AI-admin generated actions</span>
+                  </div>
+                  <div class="inline-flex items-center gap-1.5">
+                    <span class="h-2 w-2 rounded-full bg-slate-200"></span>
+                    <span>Agent & client touchpoints</span>
+                  </div>
+                  <div class="inline-flex items-center gap-1.5">
+                    <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                    <span>Risk spikes in the journey</span>
+                  </div>
+                </div>
+
+                <!-- Timeline -->
+                {% if timeline and timeline|length > 0 %}
+                <ol id="timelineList" class="relative border-l border-gray-800 pl-4 space-y-4 max-h-[320px] overflow-y-auto">
+                  {% for event in timeline %}
+                  <li class="ml-2" data-timeline-item>
+                    <div class="flex items-start gap-3">
+                      <div class="mt-1">
+                        <span class="block h-2.5 w-2.5 rounded-full border border-gray-700 bg-black
+                          {% if event.risk_flag %}
+                            ring-2 ring-amber-400/60 bg-amber-400/30 border-amber-300
+                          {% elif event.system_generated %}
+                            bg-emerald-400/40 border-emerald-300
+                          {% endif %}">
+                        </span>
+                      </div>
+                      <div class="flex-1 rounded-md border px-3 py-2.5 bg-[#020617]
+                          {% if event.system_generated %}
+                            border-emerald-400/50 bg-emerald-500/5
+                          {% else %}
+                            border-gray-800
+                          {% endif %}">
+                        <div class="flex flex-wrap items-baseline justify-between gap-2">
+                          <div class="flex items-center gap-2">
+                            <p class="text-[14px] font-semibold text-main">
+                              {{ event.title }}
+                            </p>
+                            {% if event.event_type.value == "inquiry" %}
+                            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-400/10 text-sky-100 border border-sky-400/50">
+                              New lead
+                            </span>
+                            {% elif event.event_type.value == "auto_response" %}
+                            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-400/10 text-emerald-100 border border-emerald-400/50">
+                              AI response
+                            </span>
+                            {% elif event.event_type.value == "risk_alert" %}
+                            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400/10 text-amber-100 border border-amber-400/50">
+                              Risk alert
+                            </span>
+                            {% elif event.event_type.value == "status_change" %}
+                            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-400/10 text-purple-100 border border-purple-400/50">
+                              Stage change
+                            </span>
+                            {% endif %}
+                          </div>
+                          <div class="flex flex-wrap items-center gap-2 text-[11px] text-soft">
+                            <span class="px-1.5 py-0.5 rounded-full bg-black/60 border border-gray-700">
+                              Day {{ event.day_offset }}
+                            </span>
+                            <span>{{ event.channel }}</span>
+                            <span class="text-soft">
+                              Actor: {{ event.actor }}
+                            </span>
+                          </div>
+                        </div>
+                        <p class="text-[13px] text-main mt-1.5 leading-relaxed">
+                          {{ event.description }}
+                        </p>
+                        <div class="mt-2 flex flex-wrap items-center gap-2">
+                          {% if event.sentiment %}
+                          <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-black/60 border border-gray-700 text-soft">
+                            Sentiment: {{ event.sentiment | title }}
+                          </span>
+                          {% endif %}
+                          {% if event.risk_flag and event.risk_label %}
+                          <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/60 text-amber-100">
+                            Risk: {{ event.risk_label.replace("_", " ") | title }}
+                          </span>
+                          {% endif %}
+                          {% if event.system_generated %}
+                          <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-400/10 border border-emerald-400/60 text-emerald-100">
+                            AI-admin generated
+                          </span>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                  {% endfor %}
+                </ol>
+                {% else %}
+                <p class="text-[12px] text-soft mt-2">
+                  No events available for this lead in the demo universe.
+                </p>
+                {% endif %}
+              </div>
+              {% else %}
+              <div class="rounded-lg border border-gray-800 bg-black/40 px-4 py-3.5">
+                <p class="text-[13px] text-main">
+                  No demo lead is currently available. Please ensure the demo world is initialized.
+                </p>
+              </div>
+              {% endif %}
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <!-- FOOTER CTA -->
+      <div class="mt-7 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-[12px] text-soft">
+        <p>
+          You’ve just seen <span class="font-medium text-main">one</span> 30-day journey in detail.
+          In a live deployment, THE13TH runs this intelligence layer across every lead, every agent,
+          every month.
+        </p>
+        <a href="/pilot"
+           class="inline-flex items-center gap-2 rounded-full border border-pink-400/80 bg-pink-500/10 px-4 py-2 text-[12px] font-semibold text-pink-50 hover:bg-pink-500/20 transition">
+          Talk about a paid pilot
+          <span class="text-sm">→</span>
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <!-- CINEMATIC JS: journey graph + replay -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      // Reveal hero / summary animations
+      document.querySelectorAll('.fade-in-up').forEach(function (el) {
+        el.classList.add('revealed');
+      });
+
+      // -------- Journey graph (derived from timeline) --------
+      const rawTimeline = {{ timeline | default([]) | tojson }};
+      const journeyCtx = document.getElementById('journeyChart')?.getContext('2d');
+
+      if (journeyCtx && Array.isArray(rawTimeline) && rawTimeline.length > 0) {
+        const labels = rawTimeline.map(ev => {
+          const day = ev.day_offset ?? ev.day ?? 0;
+          return 'Day ' + day;
+        });
+
+        const data = rawTimeline.map((ev, idx) => {
+          let base = 1 + (idx / Math.max(1, rawTimeline.length - 1)) * 3;
+          if (ev.risk_flag) base += 0.7;
+          if (ev.system_generated) base += 0.4;
+          return Math.min(5, base);
+        });
+
+        // eslint-disable-next-line no-undef
+        new Chart(journeyCtx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Journey intensity',
+              data,
+              tension: 0.35,
+              borderWidth: 2,
+              borderColor: 'rgba(251,113,133,1)',
+              backgroundColor: 'rgba(251,113,133,0.16)',
+              pointRadius: 3,
+              pointHoverRadius: 4,
+              pointBackgroundColor: 'rgba(251,113,133,1)',
+              fill: true,
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: {
+                ticks: { color: '#9ca3af', maxRotation: 0 },
+                grid: { color: 'rgba(148,163,184,0.18)' }
+              },
+              y: {
+                ticks: { color: '#9ca3af', stepSize: 1 },
+                grid: { color: 'rgba(148,163,184,0.18)' },
+                suggestedMin: 0,
+                suggestedMax: 5
+              }
+            }
+          }
+        });
+      }
+
+      // -------- Replay engine (cinematic scroll/highlight) --------
+      const replayBtn = document.getElementById('replayJourney');
+      const replayStatus = document.getElementById('replayStatus');
+      const replayProgress = document.getElementById('replayProgress');
+      const timelineItems = Array.from(
+        document.querySelectorAll('[data-timeline-item]')
+      );
+
+      if (
+        replayBtn &&
+        replayStatus &&
+        replayProgress &&
+        timelineItems.length > 0
+      ) {
+        replayBtn.addEventListener('click', () => {
+          // Reset
+          timelineItems.forEach(item => item.classList.remove('journey-highlight'));
+          replayProgress.style.width = '0%';
+          replayStatus.textContent = 'Replaying journey…';
+
+          const total = timelineItems.length;
+          const durationMs = 5500; // full replay length
+          const stepMs = durationMs / total;
+          let index = 0;
+
+          const timer = setInterval(() => {
+            if (index >= total) {
+              clearInterval(timer);
+              replayProgress.style.width = '100%';
+              replayStatus.textContent = 'Replay complete.';
+              return;
+            }
+
+            const item = timelineItems[index];
+            if (item) {
+              timelineItems.forEach(i => i.classList.remove('journey-highlight'));
+              item.classList.add('journey-highlight');
+              item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              const pct = ((index + 1) / total) * 100;
+              replayProgress.style.width = pct + '%';
+            }
+
+            index += 1;
+          }, stepMs);
+        });
+      } else {
+        console.debug(
+          'THE13TH demo-experience: replay disabled; timeline items:',
+          timelineItems.length
+        );
+      }
+    });
+  </script>
+</body>
+</html>

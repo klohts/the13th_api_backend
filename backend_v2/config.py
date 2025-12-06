@@ -54,7 +54,17 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # Email (SMTP) + optional SendGrid
     # -------------------------------------------------------------------------
+    # From address and display name
     email_from_address: EmailStr = Field(..., alias="EMAIL_FROM")
+    email_from_name: str = Field(
+        default="THE13TH Pilot",
+        alias="EMAIL_FROM_NAME",
+    )
+
+    # Backwards-compatible alias for any code still using settings.email_from
+    @property
+    def email_from(self) -> EmailStr:
+        return self.email_from_address
 
     email_smtp_host: str = Field(default="smtp.gmail.com", alias="EMAIL_SMTP_HOST")
     email_smtp_port: int = Field(default=587, alias="EMAIL_SMTP_PORT")
@@ -84,7 +94,8 @@ class Settings(BaseSettings):
         default=None,
         alias="LEAD_INTAKE_API_KEY",
     )
-    lead_intake_api_url: Optional[AnyHttpUrl] = Field(
+    # Accept empty string or None, don’t enforce URL yet.
+    lead_intake_api_url: Optional[str] = Field(
         default=None,
         alias="LEAD_INTAKE_API_URL",
     )

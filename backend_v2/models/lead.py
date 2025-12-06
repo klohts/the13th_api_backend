@@ -22,9 +22,17 @@ class Lead(Base):
     external_id: Optional[str] = Column(String(64), index=True, nullable=True)
     raw_payload: Dict[str, Any] = Column(JSON, nullable=True)
     created_at: datetime.datetime = Column(
-        DateTime, default=datetime.datetime.utcnow, nullable=False, index=True
+        DateTime,
+        default=datetime.datetime.utcnow,
+        nullable=False,
+        index=True,
     )
 
     __table_args__ = (
-        Index("ix_leads_tenant_source_created", "tenant_key", "source", "created_at"),
+        Index(
+            "ix_leads_tenant_source_created",
+            "tenant_key",
+            "source",
+            "created_at",
+        ),
     )

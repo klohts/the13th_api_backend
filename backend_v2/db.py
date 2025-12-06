@@ -1,63 +1,86 @@
-from __future__ import annotations
-
 import logging
-from typing import Generator
+from typing import Any, Generator
 
-from sqlmodel import SQLModel, Session, create_engine
+from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
-from .config import settings
+from backend_v2.config import settings
 
-logger = logging.getLogger("the13th.backend_v2.db")
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------
+# Declarative Base
+# ---------------------------------------------------------
+# All your models (Lead, Pilot, etc.) should subclass this.
+Base = declarative_base()
 
 
-def _create_engine():
-    """Create the SQLAlchemy/SQLModel engine for THE13TH admin DB."""
-    connect_args = {}
-    if settings.database_url.startswith("sqlite"):
-        # Required for SQLite in multithreaded FastAPI context
-        connect_args = {"check_same_thread": False}
+def _create_engine() -> Engine:
+    """
+    Create and return the SQLAlchemy engine using settings.database_url.
+    Handles SQLite vs others and enables pool_pre_ping.
+    """
+    database_url: str = settings.database_url
 
-    engine_ = create_engine(
-        settings.database_url,
-        echo=bool(settings.debug),
+    if not database_url:
+        # Fail fast with clear logging if misconfigured
+        logger.critical("DATABASE_URL / database_url is empty in settings.")
+        raise RuntimeError("DATABASE_URL / database_url is not configured")
+
+    connect_args: dict[str, Any] = {}
+    if database_url.startswith("sqlite"):
+        connect_args["check_same_thread"] = False
+
+    engine: Engine = create_engine(
+        database_url,
+        echo=settings.debug,
+        future=True,
+        pool_pre_ping=True,
         connect_args=connect_args,
     )
-    logger.debug("DB engine created for URL: %s", settings.database_url)
-    return engine_
+
+    logger.info("Database engine created for URL: %s", database_url)
+    return engine
 
 
-engine = _create_engine()
+# Global engine + session factory
+engine: Engine = _create_engine()
+
+SessionLocal = sessionmaker(
+    bind=engine,
+    class_=Session,
+    autocommit=False,
+    autoflush=False,
+    future=True,
+)
+
+
+def get_db() -> Generator[Session, None, None]:
+    """
+    FastAPI dependency that yields a DB session and guarantees cleanup.
+    """
+    db: Session = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 def init_db() -> None:
-    """Create all tables if they do not exist."""
-    # Import models so SQLModel metadata is populated
-    from . import models  # noqa: F401
-
-    logger.info("Initializing database schema...")
-    SQLModel.metadata.create_all(engine)
-    logger.info("Database schema initialized.")
-
-
-def get_session() -> Generator[Session, None, None]:
     """
-    FastAPI dependency that yields a DB session.
+    Import all ORM models and create tables if they do not exist.
 
-    - Commits if the endpoint finishes without errors.
-    - Rolls back on exception.
-    - Always closes the session.
+    This should be called once on startup (e.g. in main.py).
+    Import happens here (not at module import) to avoid circular imports.
     """
-    session = Session(engine)
-    try:
-        yield session
-        session.commit()
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("Error during DB session, rolling back: %s", exc)
-        session.rollback()
-        raise
-    finally:
-        session.close()
+    # Import all modules that define models so that
+    # Base.metadata has all tables before create_all().
+    import backend_v2.models  # noqa: F401
+
+    logger.info("Ensuring database tables exist via Base.metadata.create_all()")
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables ensured.")
 
 
-# ✅ ALIAS FOR ROUTERS EXPECTING get_db
-get_db = get_session
+__all__ = ["Base", "engine", "SessionLocal", "get_db", "init_db"]

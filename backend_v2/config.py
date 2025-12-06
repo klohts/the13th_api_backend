@@ -86,6 +86,10 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = Field(..., alias="STRIPE_WEBHOOK_SECRET")
     stripe_pilot_price_id: str = Field(..., alias="STRIPE_PILOT_PRICE_ID")
 
+    # New: redirect URLs used by pilot_admin when creating Checkout sessions
+    stripe_success_url: AnyHttpUrl = Field(..., alias="STRIPE_SUCCESS_URL")
+    stripe_cancel_url: AnyHttpUrl = Field(..., alias="STRIPE_CANCEL_URL")
+
     # -------------------------------------------------------------------------
     # Lead intake + ingestion
     # -------------------------------------------------------------------------

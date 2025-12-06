@@ -1,4 +1,3 @@
-# backend_v2/email/service.py
 from __future__ import annotations
 
 import logging
@@ -105,13 +104,23 @@ def _render_template(template_name: str, context: Mapping[str, Any]) -> str:
     try:
         template = JINJA_ENV.get_template(template_name)
     except Exception as exc:
-        logger.error("Failed to load email template %s: %s", template_name, exc, exc_info=True)
+        logger.error(
+            "Failed to load email template %s: %s",
+            template_name,
+            exc,
+            exc_info=True,
+        )
         raise
 
     try:
         return template.render(**context)
     except Exception as exc:  # defensive
-        logger.error("Failed to render email template %s: %s", template_name, exc, exc_info=True)
+        logger.error(
+            "Failed to render email template %s: %s",
+            template_name,
+            exc,
+            exc_info=True,
+        )
         raise
 
 
@@ -152,7 +161,10 @@ def _send_email(
         response = client.send(message)
     except Exception as exc:  # network / API errors
         logger.error(
-            "Failed to send email via SendGrid to %s: %s", to_email, exc, exc_info=True
+            "Failed to send email via SendGrid to %s: %s",
+            to_email,
+            exc,
+            exc_info=True,
         )
         return
 
@@ -273,16 +285,23 @@ def send_admin_pilot_notification(pilot_request: Any) -> None:
     )
 
 
-def send_pilot_checkout_email(pilot: Any, checkout_url: str) -> None:
-    """Send the Stripe checkout link to the brokerage once approved."""
-    to_email = _safe_attr(pilot, "contact_email") or _safe_attr(pilot, "email")
-    full_name = _safe_attr(pilot, "contact_name") or _safe_attr(pilot, "full_name")
-    brokerage_name = _safe_attr(pilot, "brokerage_name")
+def send_pilot_checkout_email(
+    to_email: str,
+    checkout_url: str,
+    brokerage_name: Optional[str] = None,
+    full_name: Optional[str] = None,
+) -> None:
+    """
+    Send the Stripe checkout link to the brokerage once approved.
 
+    Called from pilot_admin.approve_pilot with explicit to_email / brokerage_name.
+    """
     if not to_email:
         logger.error(
-            "send_pilot_checkout_email called without a contact email; payload=%r",
-            pilot,
+            "send_pilot_checkout_email called without a contact email; "
+            "to_email=%r checkout_url=%r",
+            to_email,
+            checkout_url,
         )
         return
 

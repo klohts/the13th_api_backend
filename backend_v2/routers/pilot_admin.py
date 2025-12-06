@@ -41,7 +41,10 @@ class ApprovePilotResponse(BaseModel):
 
 
 @router.get("/admin/pilots/", response_class=HTMLResponse)
-def list_pilots(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+def list_pilots(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
     """
     Render the admin pilot command center.
 
@@ -115,21 +118,31 @@ def approve_pilot(
             detail="Stripe API key is not configured",
         )
 
+    # Derive customer email & brokerage name with fallbacks
+    customer_email: Optional[str] = (
+        getattr(pilot, "email", None) or getattr(pilot, "contact_email", None)
+    )
+    brokerage_name: str = (
+        getattr(pilot, "brokerage_name", None)
+        or getattr(pilot, "brokerage", None)
+        or ""
+    )
+
     stripe.api_key = settings.stripe_api_key
 
     try:
         logger.info(
             "Creating Stripe Checkout Session for pilot_id=%s email=%s",
             pilot.id,
-            getattr(pilot, "contact_email", None),
+            customer_email,
         )
         checkout_session = stripe.checkout.Session.create(
             mode="payment",
             line_items=[{"price": price_id, "quantity": 1}],
-            customer_email=getattr(pilot, "contact_email", None),
+            customer_email=customer_email,
             metadata={
                 "pilot_id": str(pilot.id),
-                "brokerage_name": getattr(pilot, "brokerage_name", ""),
+                "brokerage_name": brokerage_name,
             },
             success_url=settings.stripe_success_url,
             cancel_url=settings.stripe_cancel_url,
@@ -157,9 +170,9 @@ def approve_pilot(
     # Fire-and-forget email – failure is logged but does not block approval
     try:
         send_pilot_checkout_email(
-            to_email=getattr(pilot, "contact_email", None),
+            to_email=customer_email,
             checkout_url=checkout_url,
-            brokerage_name=getattr(pilot, "brokerage_name", None),
+            brokerage_name=brokerage_name or None,
         )
     except Exception as exc:  # noqa: BLE001
         logger.exception(

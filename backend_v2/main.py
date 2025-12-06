@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from backend_v2.config import settings
 from backend_v2.db import init_db
@@ -17,6 +18,7 @@ from backend_v2.routers import tenant as tenant_router
 from backend_v2.routers import client_experience_sim
 from backend_v2.api import pilot as pilot_api
 from backend_v2.routers import ingestion as ingestion_router
+from backend_v2.routers import demo_experience as demo_experience_router
 
 import backend_v2.routers.pilot_admin as pilot_admin_router
 import backend_v2.routers.pilot_request as pilot_request_router
@@ -29,6 +31,7 @@ load_dotenv()
 
 logger = logging.getLogger("backend_v2.main")
 
+templates = Jinja2Templates(directory="backend_v2/templates")
 
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, debug=settings.debug)
@@ -56,7 +59,7 @@ def create_app() -> FastAPI:
     app.include_router(api_router.router)
     app.include_router(tenant_router.router)
     app.include_router(client_experience_sim.router)
-    
+    app.include_router(demo_experience_router.router)
     app.include_router(pilot_api.router)
     app.include_router(pilot_admin_router.router)
     app.include_router(stripe_webhooks_router.router)

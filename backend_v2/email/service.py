@@ -1,279 +1,358 @@
+# backend_v2/email/service.py
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+import os
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Mapping, Optional
 
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pydantic import EmailStr
-
-from backend_v2.schemas.pilot import PilotRequest
-from backend_v2.config import settings
-from .client import email_client
-
-logger = logging.getLogger(__name__)
-
-# === Pilot request confirmation (already live) ===
-
-PILOT_TEMPLATE_NAME = "pilot_confirmation.html"
-PILOT_SUBJECT = "Your 7-Day Revenue Intelligence Pilot with THE13TH"
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Content
 
 
-def build_pilot_context(pilot: PilotRequest) -> Dict[str, Any]:
-    """Map PilotRequest into template context."""
-    full_name = f"{pilot.first_name} {pilot.last_name}".strip()
-    return {
-        "full_name": full_name,
-        "first_name": pilot.first_name,
-        "last_name": pilot.last_name,
-        "brokerage_name": pilot.brokerage_name,
-        "website": pilot.website or "",
-        "agents_on_team": pilot.agents_on_team or "Not specified",
-        "monthly_online_leads": pilot.monthly_online_leads or "Not specified",
-        "primary_focus": pilot.primary_focus or "Not specified",
-        "main_problem": pilot.main_problem or "",
-        "anything_special": pilot.anything_special or "",
-    }
+logger = logging.getLogger("the13th.backend_v2.email.service")
+
+TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
 
-def send_pilot_confirmation(pilot: PilotRequest) -> None:
-    """
-    Send confirmation email to the broker after they submit a pilot request.
+@dataclass
+class EmailSettings:
+    """Environment-driven email configuration for THE13TH."""
 
-    Raises exceptions on failure; caller should handle/log as appropriate.
-    """
-    to_email: EmailStr = getattr(pilot, "contact_email", getattr(pilot, "work_email", pilot.email))
-    context = build_pilot_context(pilot)
+    sendgrid_api_key: str
+    from_email: EmailStr
+    from_name: str
+    admin_email: Optional[EmailStr]
 
-    plain_text_fallback = (
-        f"Hi {pilot.first_name},\n\n"
-        "Thanks for requesting a 7-day Revenue Intelligence Pilot with THE13TH. "
-        "We’ll review your details and email next steps shortly.\n\n"
-        "– THE13TH Pilot Desk"
+    @classmethod
+    def from_env(cls) -> "EmailSettings":
+        """
+        Required:
+            SENDGRID_API_KEY
+            EMAIL_FROM           e.g. pilot@the13thhq.com
+
+        Optional:
+            EMAIL_FROM_NAME      default: "THE13TH Pilot Desk"
+            EMAIL_ADMIN          where admin notifications are sent
+        """
+        missing: list[str] = []
+
+        api_key = os.getenv("SENDGRID_API_KEY")
+        if not api_key:
+            missing.append("SENDGRID_API_KEY")
+
+        from_email = os.getenv("EMAIL_FROM")
+        if not from_email:
+            missing.append("EMAIL_FROM")
+
+        if missing:
+            raise RuntimeError(
+                f"Missing required email environment variables: {', '.join(missing)}"
+            )
+
+        from_name = os.getenv("EMAIL_FROM_NAME", "THE13TH Pilot Desk")
+        admin_email = os.getenv("EMAIL_ADMIN")
+
+        email_obj = EmailStr(from_email)
+
+        return cls(
+            sendgrid_api_key=api_key,
+            from_email=email_obj,
+            from_name=from_name,
+            admin_email=EmailStr(admin_email) if admin_email else None,
+        )
+
+
+def _init_settings() -> Optional[EmailSettings]:
+    try:
+        settings = EmailSettings.from_env()
+    except Exception as exc:  # defensive
+        logger.error("EmailSettings failed to initialise: %s", exc, exc_info=True)
+        return None
+
+    logger.info("EmailSettings initialised for %s", settings.from_email)
+    return settings
+
+
+SETTINGS: Optional[EmailSettings] = _init_settings()
+
+
+def _init_jinja() -> Optional[Environment]:
+    if not TEMPLATES_DIR.exists():
+        logger.error("Email templates directory does not exist: %s", TEMPLATES_DIR)
+        return None
+
+    env = Environment(
+        loader=FileSystemLoader(str(TEMPLATES_DIR)),
+        autoescape=select_autoescape(["html", "xml"]),
+        enable_async=False,
     )
-
-    logger.info("Sending pilot confirmation email to %s", to_email)
-
-    email_client.send_html_email(
-        to_email=to_email,
-        subject=PILOT_SUBJECT,
-        template_name=PILOT_TEMPLATE_NAME,
-        context=context,
-        plain_text_fallback=plain_text_fallback,
-    )
+    return env
 
 
-# === Post-payment onboarding automation (new) ===
-
-PILOT_ONBOARDING_TEMPLATE_NAME = "pilot_onboarding.html"
-PILOT_ONBOARDING_SUBJECT = "Welcome — Your THE13TH Revenue Intelligence Pilot Is Live"
+JINJA_ENV: Optional[Environment] = _init_jinja()
 
 
-def build_pilot_onboarding_context(
+def _render_template(template_name: str, context: Mapping[str, Any]) -> str:
+    if JINJA_ENV is None:
+        raise RuntimeError(
+            "Jinja environment is not initialised; templates directory missing"
+        )
+
+    try:
+        template = JINJA_ENV.get_template(template_name)
+    except Exception as exc:
+        logger.error("Failed to load email template %s: %s", template_name, exc, exc_info=True)
+        raise
+
+    try:
+        return template.render(**context)
+    except Exception as exc:  # defensive
+        logger.error("Failed to render email template %s: %s", template_name, exc, exc_info=True)
+        raise
+
+
+def _send_email(
     *,
-    full_name: str,
-    brokerage_name: str,
-) -> Dict[str, Any]:
+    to_email: str,
+    subject: str,
+    html_body: str,
+    plain_body: Optional[str] = None,
+    cc: Optional[list[str]] = None,
+) -> None:
     """
-    Build context for the post-payment onboarding email.
+    Core SendGrid send wrapper.
 
-    This is intentionally lightweight and only depends on primitives so it can
-    be called from webhooks, admin tools, or background jobs.
+    Never raises to the caller; failures are logged as errors so the
+    pilot flow keeps running even if email fails.
     """
-    full_name_clean = (full_name or "").strip()
-    first_name = full_name_clean.split(" ", 1)[0] if full_name_clean else "there"
+    if SETTINGS is None:
+        logger.error("Email SETTINGS is not initialised; skipping send to %s", to_email)
+        return
 
-    return {
-        "full_name": full_name_clean or first_name,
-        "first_name": first_name,
+    message = Mail(
+        from_email=(SETTINGS.from_email, SETTINGS.from_name),
+        to_emails=to_email,
+        subject=subject,
+        html_content=html_body,
+    )
+
+    if plain_body:
+        message.add_content(Content("text/plain", plain_body))
+
+    if cc:
+        # Mail.cc expects a list of email strings
+        message.cc = cc
+
+    try:
+        client = SendGridAPIClient(SETTINGS.sendgrid_api_key)
+        response = client.send(message)
+    except Exception as exc:  # network / API errors
+        logger.error(
+            "Failed to send email via SendGrid to %s: %s", to_email, exc, exc_info=True
+        )
+        return
+
+    if response.status_code >= 400:
+        logger.error(
+            "SendGrid responded with error for %s: status=%s body=%s",
+            to_email,
+            response.status_code,
+            getattr(response, "body", b"")[:1000],
+        )
+    else:
+        logger.info(
+            "Email sent successfully: to=%s subject=%s status=%s",
+            to_email,
+            subject,
+            response.status_code,
+        )
+
+
+def _safe_attr(obj: Any, name: str, default: Any = "") -> Any:
+    """Return attribute or dict key, tolerant of different payload types."""
+    if obj is None:
+        return default
+    if hasattr(obj, name):
+        return getattr(obj, name)
+    if isinstance(obj, Mapping) and name in obj:
+        return obj[name]
+    return default
+
+
+# ============================================================
+# Public email functions used by the rest of backend_v2
+# ============================================================
+
+
+def send_pilot_confirmation(pilot_request: Any) -> None:
+    """Send confirmation email to the brokerage that submitted a pilot request."""
+    to_email = _safe_attr(pilot_request, "contact_email") or _safe_attr(
+        pilot_request, "email"
+    )
+    full_name = _safe_attr(pilot_request, "contact_name") or _safe_attr(
+        pilot_request, "full_name"
+    )
+    brokerage_name = _safe_attr(pilot_request, "brokerage_name")
+    problem = _safe_attr(pilot_request, "problem_notes") or _safe_attr(
+        pilot_request, "problem"
+    )
+    team_size = _safe_attr(pilot_request, "agents_count") or _safe_attr(
+        pilot_request, "team_size"
+    )
+    lead_volume = _safe_attr(pilot_request, "lead_volume")
+
+    if not to_email:
+        logger.error(
+            "send_pilot_confirmation called without a contact email; payload=%r",
+            pilot_request,
+        )
+        return
+
+    context = {
+        "full_name": full_name or "there",
         "brokerage_name": brokerage_name or "your brokerage",
-        "support_email": str(settings.email_from_address),
+        "problem": problem or "Slow follow-up and lead leakage",
+        "team_size": team_size or "your team",
+        "lead_volume": lead_volume or "your online leads",
     }
+
+    html_body = _render_template("pilot_confirmation.html", context)
+    subject = "We’ve received your Revenue Intelligence Pilot request"
+
+    _send_email(
+        to_email=to_email,
+        subject=subject,
+        html_body=html_body,
+    )
+
+
+def send_admin_pilot_notification(pilot_request: Any) -> None:
+    """Send internal notification to THE13TH admin when a pilot is requested."""
+    if SETTINGS is None or not SETTINGS.admin_email:
+        logger.warning(
+            "Admin email not configured; skipping admin pilot notification for %r",
+            pilot_request,
+        )
+        return
+
+    to_email = str(SETTINGS.admin_email)
+    full_name = _safe_attr(pilot_request, "contact_name") or _safe_attr(
+        pilot_request, "full_name"
+    )
+    brokerage_name = _safe_attr(pilot_request, "brokerage_name")
+    problem = _safe_attr(pilot_request, "problem_notes") or _safe_attr(
+        pilot_request, "problem"
+    )
+    team_size = _safe_attr(pilot_request, "agents_count") or _safe_attr(
+        pilot_request, "team_size"
+    )
+    lead_volume = _safe_attr(pilot_request, "lead_volume")
+    source_tag = _safe_attr(pilot_request, "source")
+
+    context = {
+        "full_name": full_name or "",
+        "brokerage_name": brokerage_name or "",
+        "problem": problem or "",
+        "team_size": team_size or "",
+        "lead_volume": lead_volume or "",
+        "source": source_tag or "",
+        "raw": pilot_request,
+    }
+
+    html_body = _render_template("admin_pilot_notification.html", context)
+    subject = f"[THE13TH] New Revenue Intelligence Pilot request – {brokerage_name}"
+
+    _send_email(
+        to_email=to_email,
+        subject=subject,
+        html_body=html_body,
+    )
+
+
+def send_pilot_checkout_email(pilot: Any, checkout_url: str) -> None:
+    """Send the Stripe checkout link to the brokerage once approved."""
+    to_email = _safe_attr(pilot, "contact_email") or _safe_attr(pilot, "email")
+    full_name = _safe_attr(pilot, "contact_name") or _safe_attr(pilot, "full_name")
+    brokerage_name = _safe_attr(pilot, "brokerage_name")
+
+    if not to_email:
+        logger.error(
+            "send_pilot_checkout_email called without a contact email; payload=%r",
+            pilot,
+        )
+        return
+
+    context = {
+        "full_name": full_name or "there",
+        "brokerage_name": brokerage_name or "your brokerage",
+        "checkout_url": checkout_url,
+    }
+
+    html_body = _render_template("pilot_checkout.html", context)
+    subject = "Confirm your THE13TH Revenue Intelligence Pilot"
+
+    _send_email(
+        to_email=to_email,
+        subject=subject,
+        html_body=html_body,
+    )
 
 
 def send_pilot_onboarding_email(
-    *,
-    to_email: EmailStr,
-    full_name: str,
-    brokerage_name: str,
+    to_email: str, full_name: str, brokerage_name: str
 ) -> None:
-    """
-    Send the first onboarding email after a pilot is activated (Stripe payment
-    succeeded and the pilot status has been flipped to ACTIVE).
+    """Send onboarding email when Stripe marks the pilot as active."""
+    if not to_email:
+        logger.error("send_pilot_onboarding_email called with empty to_email")
+        return
 
-    This should be called exactly once per successful pilot activation.
-    """
-    context = build_pilot_onboarding_context(
-        full_name=full_name,
-        brokerage_name=brokerage_name,
-    )
-
-    plain_text_fallback = (
-        f"Hi {context['first_name']},\n\n"
-        "Your 7-day Revenue Intelligence Pilot with THE13TH is now active.\n\n"
-        "Over the next 24 hours we’ll:\n"
-        "• Connect THE13TH to one lead inbox + one lead source\n"
-        "• Turn on intelligent first-touch and follow-up email support\n"
-        "• Start watching lead flow and agent response speed in your pilot dashboard\n\n"
-        f"If you’d like to get a head start, reply to this email with:\n"
-        "• The inbox you’d like us to connect\n"
-        "• Your primary lead source for the pilot week\n\n"
-        f"If you have any questions, you can always reach us at {context['support_email']}.\n\n"
-        "– THE13TH Pilot Desk"
-    )
-
-    logger.info(
-        "Sending pilot onboarding email to %s for brokerage=%s",
-        to_email,
-        brokerage_name,
-    )
-
-    email_client.send_html_email(
-        to_email=to_email,
-        subject=PILOT_ONBOARDING_SUBJECT,
-        template_name=PILOT_ONBOARDING_TEMPLATE_NAME,
-        context=context,
-        plain_text_fallback=plain_text_fallback,
-    )
-
-
-# === Pilot checkout email (admin approval → Stripe payment link) ===
-
-PILOT_CHECKOUT_TEMPLATE_NAME = "pilot_checkout.html"
-PILOT_CHECKOUT_SUBJECT = "THE13TH Pilot Approved — Complete Your Setup"
-
-
-def build_pilot_checkout_context(
-    *,
-    brokerage_name: Optional[str],
-    checkout_url: str,
-) -> Dict[str, Any]:
-    """
-    Build context for the checkout email sent after admin approval.
-
-    Keeps dependencies minimal so this can be called from routers, admin tools,
-    or background jobs without needing a full PilotRequest object.
-    """
-    return {
+    context = {
+        "full_name": full_name or "there",
         "brokerage_name": brokerage_name or "your brokerage",
-        "checkout_url": checkout_url,
-        "support_email": str(settings.email_from_address),
     }
 
+    html_body = _render_template("pilot_onboarding.html", context)
+    subject = "Your THE13TH Revenue Intelligence Pilot is now live"
 
-def send_pilot_checkout_email(
-    to_email: EmailStr,
-    checkout_url: str,
-    brokerage_name: Optional[str] = None,
-) -> None:
-    """
-    Send Stripe checkout link to the broker after an admin approves their pilot.
-
-    Signature is positional-friendly for existing calls in routers:
-        send_pilot_checkout_email(pilot.work_email, checkout_url, pilot.brokerage_name)
-    """
-    if not checkout_url:
-        raise ValueError("checkout_url is required")
-
-    context = build_pilot_checkout_context(
-        brokerage_name=brokerage_name,
-        checkout_url=checkout_url,
-    )
-
-    plain_text_fallback = (
-        "Hi there,\n\n"
-        "Your 7-day Revenue Intelligence Pilot with THE13TH has been approved.\n\n"
-        "To activate your pilot, please complete your setup using this secure link:\n"
-        f"{checkout_url}\n\n"
-        f"If you have any questions, you can reply to this email or reach us at "
-        f"{context['support_email']}.\n\n"
-        "– THE13TH Pilot Desk"
-    )
-
-    logger.info(
-        "Sending pilot checkout email to %s for brokerage=%s",
-        to_email,
-        brokerage_name or "N/A",
-    )
-
-    email_client.send_html_email(
+    _send_email(
         to_email=to_email,
-        subject=PILOT_CHECKOUT_SUBJECT,
-        template_name=PILOT_CHECKOUT_TEMPLATE_NAME,
-        context=context,
-        plain_text_fallback=plain_text_fallback,
+        subject=subject,
+        html_body=html_body,
     )
 
 
-# === 7-Day pilot summary + recommendation email (end of pilot) ===
-
-PILOT_SUMMARY_TEMPLATE_NAME = "pilot_summary.html"
-PILOT_SUMMARY_SUBJECT = "Your 7-Day Pilot Summary & Recommendation — THE13TH"
-
-
-def build_pilot_summary_context(
-    *,
-    full_name: str,
-    brokerage_name: str,
-) -> Dict[str, Any]:
+def send_pilot_summary_email(pilot: Any, summary_context: Mapping[str, Any]) -> None:
     """
-    Minimal context for the 7-day summary email.
+    Send the 7-day pilot summary + recommendations.
 
-    Metrics can be added later (lead counts, response speed, etc.).
+    Wired for future use; safe even if not yet invoked.
     """
-    full_name_clean = (full_name or "").strip()
-    first_name = full_name_clean.split(" ", 1)[0] if full_name_clean else "there"
+    to_email = _safe_attr(pilot, "contact_email") or _safe_attr(pilot, "email")
+    full_name = _safe_attr(pilot, "contact_name") or _safe_attr(pilot, "full_name")
+    brokerage_name = _safe_attr(pilot, "brokerage_name")
 
-    return {
-        "full_name": full_name_clean or first_name,
-        "first_name": first_name,
+    if not to_email:
+        logger.error(
+            "send_pilot_summary_email called without a contact email; payload=%r",
+            pilot,
+        )
+        return
+
+    context = {
+        "full_name": full_name or "there",
         "brokerage_name": brokerage_name or "your brokerage",
-        "support_email": str(settings.email_from_address),
-        # Extend later with real metrics:
-        # "total_leads": metrics.total_leads,
-        # "avg_response_minutes": metrics.avg_response_minutes,
-        # etc.
+        **summary_context,
     }
 
+    html_body = _render_template("pilot_summary.html", context)
+    subject = "Your Revenue Intelligence Pilot results & recommendations"
 
-def send_pilot_summary_email(
-    *,
-    to_email: EmailStr,
-    full_name: str,
-    brokerage_name: str,
-) -> None:
-    """
-    Send the 7-day pilot summary + recommendation email.
-
-    Call this from a scheduled job that runs ~7 days after activation.
-    """
-    context = build_pilot_summary_context(
-        full_name=full_name,
-        brokerage_name=brokerage_name,
-    )
-
-    plain_text_fallback = (
-        f"Hi {context['first_name']},\n\n"
-        "Your 7-day Revenue Intelligence Pilot with THE13TH has now completed.\n\n"
-        "Over the last week, THE13TH has been monitoring lead flow and follow-up patterns "
-        "so you can see where revenue is being left on the table.\n\n"
-        "Recommendation:\n"
-        "Our strong recommendation is to keep THE13TH running beyond the pilot so that email "
-        "intelligence and response discipline become a permanent part of how your brokerage operates.\n\n"
-        "To move into a full subscription, simply reply to this email and we’ll convert your account "
-        "to ongoing access.\n\n"
-        "If you’d like to review the pilot together, reply and we’ll schedule a quick call.\n\n"
-        "– THE13TH Pilot Desk"
-    )
-
-    logger.info(
-        "Sending 7-day pilot summary email to %s for brokerage=%s",
-        to_email,
-        brokerage_name,
-    )
-
-    email_client.send_html_email(
+    _send_email(
         to_email=to_email,
-        subject=PILOT_SUMMARY_SUBJECT,
-        template_name=PILOT_SUMMARY_TEMPLATE_NAME,
-        context=context,
-        plain_text_fallback=plain_text_fallback,
+        subject=subject,
+        html_body=html_body,
     )

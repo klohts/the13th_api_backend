@@ -40,7 +40,7 @@ def send_pilot_confirmation(pilot: PilotRequest) -> None:
 
     Raises exceptions on failure; caller should handle/log as appropriate.
     """
-    to_email: EmailStr = pilot.work_email
+    to_email: EmailStr = getattr(pilot, "contact_email", getattr(pilot, "work_email", pilot.email))
     context = build_pilot_context(pilot)
 
     plain_text_fallback = (

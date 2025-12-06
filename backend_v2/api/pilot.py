@@ -24,7 +24,7 @@ def _build_problem_notes(payload: PilotRequest) -> str:
     """
     Condense marketing form fields into a single admin-facing notes string.
     """
-    pieces = []
+    pieces: list[str] = []
 
     if payload.problem:
         pieces.append(f"Primary problem: {payload.problem}")
@@ -96,8 +96,6 @@ def create_pilot_request(
 
     # 2) Best-effort confirmation email (do NOT break the API if it fails)
     try:
-        # Existing email code expects a PilotRequest-like object
-        # with work_email / full_name – our schema now provides those properties.
         send_pilot_confirmation(payload)
         logger.info("Pilot confirmation email sent for pilot_id=%s", pilot.id)
     except Exception as exc:  # noqa: BLE001

@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------
 # Declarative Base
 # ---------------------------------------------------------
-# All your models (Lead, Pilot, etc.) should subclass this.
 Base = declarative_base()
 
 
@@ -24,7 +23,6 @@ def _create_engine() -> Engine:
     database_url: str = settings.database_url
 
     if not database_url:
-        # Fail fast with clear logging if misconfigured
         logger.critical("DATABASE_URL / database_url is empty in settings.")
         raise RuntimeError("DATABASE_URL / database_url is not configured")
 
@@ -59,12 +57,25 @@ SessionLocal = sessionmaker(
 def get_db() -> Generator[Session, None, None]:
     """
     FastAPI dependency that yields a DB session and guarantees cleanup.
+
+    Usage:
+        def endpoint(db: Session = Depends(get_db)):
+            ...
     """
     db: Session = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+
+def get_session() -> Generator[Session, None, None]:
+    """
+    Backwards-compatible alias for get_db, for modules that still import
+    `get_session` from backend_v2.db.
+    """
+    # Delegate to get_db's generator so teardown logic still runs.
+    yield from get_db()
 
 
 def init_db() -> None:
@@ -74,8 +85,6 @@ def init_db() -> None:
     This should be called once on startup (e.g. in main.py).
     Import happens here (not at module import) to avoid circular imports.
     """
-    # Import all modules that define models so that
-    # Base.metadata has all tables before create_all().
     import backend_v2.models  # noqa: F401
 
     logger.info("Ensuring database tables exist via Base.metadata.create_all()")
@@ -83,4 +92,11 @@ def init_db() -> None:
     logger.info("Database tables ensured.")
 
 
-__all__ = ["Base", "engine", "SessionLocal", "get_db", "init_db"]
+__all__ = [
+    "Base",
+    "engine",
+    "SessionLocal",
+    "get_db",
+    "get_session",
+    "init_db",
+]

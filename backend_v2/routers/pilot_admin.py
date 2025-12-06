@@ -128,6 +128,11 @@ def approve_pilot(
         or ""
     )
 
+    # Build success / cancel URLs from PUBLIC_BASE_URL
+    public_base = settings.public_base_url.rstrip("/")
+    success_url = f"{public_base}/thankyou?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{public_base}/pilot"
+
     stripe.api_key = settings.stripe_api_key
 
     try:
@@ -144,8 +149,8 @@ def approve_pilot(
                 "pilot_id": str(pilot.id),
                 "brokerage_name": brokerage_name,
             },
-            success_url=settings.stripe_success_url,
-            cancel_url=settings.stripe_cancel_url,
+            success_url=success_url,
+            cancel_url=cancel_url,
         )
     except Exception as exc:  # noqa: BLE001
         logger.exception(

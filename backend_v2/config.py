@@ -90,12 +90,7 @@ class Settings(BaseSettings):
     # Env: STRIPE_PILOT_PRICE_ID
     stripe_pilot_price_id: str
 
-    # Env: STRIPE_SUCCESS_URL
-    stripe_success_url: str = str
-
-    # Env: STRIPE_CANCEL_URL
-    stripe_cancel_url: str = str
-
+    
     # --------------------------------------------------
     # Admin auth (for /admin routes etc.)
     # --------------------------------------------------

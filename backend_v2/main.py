@@ -19,6 +19,8 @@ from backend_v2.routers import client_experience_sim
 from backend_v2.api import pilot as pilot_api
 from backend_v2.routers import ingestion as ingestion_router
 from backend_v2.routers import demo_experience as demo_experience_router
+from backend_v2.routers import admin_ingestion as admin_ingestion_router
+
 
 import backend_v2.routers.pilot_admin as pilot_admin_router
 import backend_v2.routers.pilot_request as pilot_request_router
@@ -60,10 +62,12 @@ def create_app() -> FastAPI:
     app.include_router(tenant_router.router)
     app.include_router(client_experience_sim.router)
     app.include_router(demo_experience_router.router)
+    
     app.include_router(pilot_api.router)
     app.include_router(pilot_admin_router.router)
     app.include_router(stripe_webhooks_router.router)
     app.include_router(ingestion_router.router)
+    app.include_router(admin_ingestion_router.router)
     app.include_router(admin_leads_router.router)
     
     # Static

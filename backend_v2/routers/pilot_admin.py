@@ -54,6 +54,18 @@ def list_pilots(
     )
 
 
+def _unwrap_secret(value: Any) -> Optional[str]:
+    """Return plain string from SecretStr or similar, or None."""
+    if value is None:
+        return None
+    if hasattr(value, "get_secret_value"):
+        try:
+            return value.get_secret_value()
+        except Exception:
+            return None
+    return str(value)
+
+
 @router.post("/admin/pilots/{pilot_id}/approve", response_model=ApprovePilotResponse)
 def approve_pilot(
     pilot_id: int,
@@ -97,8 +109,9 @@ def approve_pilot(
             detail="Stripe pilot price is not configured",
         )
 
-    if not settings.stripe_api_key:
-        logger.error("STRIPE_API_KEY is not configured.")
+    api_key = _unwrap_secret(getattr(settings, "stripe_api_key", None))
+    if not api_key:
+        logger.error("STRIPE_API_KEY is not configured or invalid.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Stripe API key is not configured",
@@ -130,16 +143,17 @@ def approve_pilot(
     success_url = f"{public_base}/thankyou?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{public_base}/pilot"
 
-    stripe.api_key = settings.stripe_api_key
+    stripe.api_key = api_key
 
     try:
         logger.info(
-            "Creating Stripe Checkout Session for pilot_id=%s email=%s",
+            "Creating Stripe Checkout Session for pilot_id=%s email=%s price_id=%s",
             pilot.id,
             customer_email,
+            price_id,
         )
         checkout_session = stripe.checkout.Session.create(
-            mode="subscription",  # <— IMPORTANT: subscription for recurring price
+            mode="subscription",  # subscription price for recurring pilot
             line_items=[{"price": price_id, "quantity": 1}],
             customer_email=customer_email,
             metadata={
@@ -155,6 +169,7 @@ def approve_pilot(
             pilot.id,
             exc,
         )
+        # Still return 500 so the UI shows the correct error
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to create Stripe checkout",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
@@ -9,7 +10,6 @@ from pydantic import EmailStr
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Content
 
-# Use the central email config (already initialised at startup)
 from backend_v2.email import config as email_config
 
 logger = logging.getLogger("the13th.backend_v2.email.service")
@@ -23,11 +23,6 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
 
 class EmailSettingsCompat:
-    """
-    Thin wrapper around backend_v2.email.config.email_settings, so this
-    service does not depend on its exact implementation.
-    """
-
     def __init__(
         self,
         sendgrid_api_key: str,
@@ -41,15 +36,31 @@ class EmailSettingsCompat:
         self.admin_email = admin_email
 
 
+def _unwrap_secret(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if hasattr(value, "get_secret_value"):
+        try:
+            return value.get_secret_value()
+        except Exception:
+            return None
+    return str(value)
+
+
+def _first_non_empty(*values: Any) -> Optional[str]:
+    for v in values:
+        v = _unwrap_secret(v)
+        if v:
+            return v
+    return None
+
+
 def _get_settings() -> Optional[EmailSettingsCompat]:
     """
-    Load email settings from backend_v2.email.config.
+    Load email settings from backend_v2.email.config, with env fallbacks.
 
-    Expects email_config to expose an 'email_settings' instance with:
-    - sendgrid_api_key
-    - from_email
-    - from_name (optional)
-    - admin_email (optional)
+    Tries multiple common field names so we don't depend on the exact config
+    implementation.
     """
     raw = getattr(email_config, "email_settings", None)
 
@@ -60,23 +71,50 @@ def _get_settings() -> Optional[EmailSettingsCompat]:
         )
         return None
 
-    sendgrid_api_key = getattr(raw, "sendgrid_api_key", None)
-    from_email = getattr(raw, "from_email", None)
-    from_name = getattr(raw, "from_name", None) or "THE13TH Pilot Desk"
-    admin_email = getattr(raw, "admin_email", None)
+    # Try a few likely names for the SendGrid API key
+    sendgrid_api_key = _first_non_empty(
+        getattr(raw, "sendgrid_api_key", None),
+        getattr(raw, "SENDGRID_API_KEY", None),
+        getattr(raw, "api_key", None),
+        os.getenv("SENDGRID_API_KEY"),
+        os.getenv("EMAIL_SENDGRID_API_KEY"),
+    )
+
+    # From email / name
+    from_email = _first_non_empty(
+        getattr(raw, "from_email", None),
+        getattr(raw, "EMAIL_FROM", None),
+        getattr(raw, "sender", None),
+        os.getenv("EMAIL_FROM"),
+    )
+
+    from_name = _first_non_empty(
+        getattr(raw, "from_name", None),
+        getattr(raw, "EMAIL_FROM_NAME", None),
+        os.getenv("EMAIL_FROM_NAME"),
+        "THE13TH Pilot Desk",
+    )
+
+    admin_email = _first_non_empty(
+        getattr(raw, "admin_email", None),
+        getattr(raw, "EMAIL_ADMIN", None),
+        os.getenv("EMAIL_ADMIN"),
+    )
 
     if not sendgrid_api_key or not from_email:
         logger.error(
-            "Email settings incomplete (sendgrid_api_key or from_email missing); "
-            "emails will be skipped."
+            "Email settings incomplete (SendGrid API key or from_email missing); "
+            "emails will be skipped. "
+            "Fields on email_settings=%s",
+            [attr for attr in dir(raw) if not attr.startswith("_")],
         )
         return None
 
     return EmailSettingsCompat(
-        sendgrid_api_key=str(sendgrid_api_key),
-        from_email=EmailStr(str(from_email)),
+        sendgrid_api_key=sendgrid_api_key,
+        from_email=EmailStr(from_email),
         from_name=str(from_name),
-        admin_email=EmailStr(str(admin_email)) if admin_email else None,
+        admin_email=EmailStr(admin_email) if admin_email else None,
     )
 
 
@@ -270,8 +308,8 @@ def send_pilot_confirmation(pilot_request: Any) -> None:
 
 def send_admin_pilot_notification(pilot_request: Any) -> None:
     """Send internal notification to THE13TH admin when a pilot is requested."""
-    settings = _get_settings()
-    admin_email = settings.admin_email if settings else None
+    settings_obj = _get_settings()
+    admin_email = settings_obj.admin_email if settings_obj else None
 
     if not admin_email:
         logger.warning(

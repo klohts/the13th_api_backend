@@ -66,6 +66,35 @@ def _unwrap_secret(value: Any) -> Optional[str]:
     return str(value)
 
 
+def _determine_checkout_mode(price_id: str) -> str:
+    """
+    Inspect the Stripe Price to decide whether to use 'subscription' or 'payment'.
+
+    - If price.recurring is present -> 'subscription'
+    - Otherwise -> 'payment'
+    """
+    try:
+        price_obj = stripe.Price.retrieve(price_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "Failed to retrieve Stripe Price %s; defaulting to payment mode: %s",
+            price_id,
+            exc,
+            exc_info=True,
+        )
+        return "payment"
+
+    is_recurring = getattr(price_obj, "recurring", None) is not None
+    mode = "subscription" if is_recurring else "payment"
+    logger.info(
+        "Determined checkout mode for price %s: %s (recurring=%s)",
+        price_id,
+        mode,
+        is_recurring,
+    )
+    return mode
+
+
 @router.post("/admin/pilots/{pilot_id}/approve", response_model=ApprovePilotResponse)
 def approve_pilot(
     pilot_id: int,
@@ -145,15 +174,19 @@ def approve_pilot(
 
     stripe.api_key = api_key
 
+    # Decide mode based on the price object itself
+    checkout_mode = _determine_checkout_mode(price_id)
+
     try:
         logger.info(
-            "Creating Stripe Checkout Session for pilot_id=%s email=%s price_id=%s",
+            "Creating Stripe Checkout Session for pilot_id=%s email=%s price_id=%s mode=%s",
             pilot.id,
             customer_email,
             price_id,
+            checkout_mode,
         )
         checkout_session = stripe.checkout.Session.create(
-            mode="subscription",  # subscription price for recurring pilot
+            mode=checkout_mode,
             line_items=[{"price": price_id, "quantity": 1}],
             customer_email=customer_email,
             metadata={

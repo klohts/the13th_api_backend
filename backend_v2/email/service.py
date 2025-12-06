@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Optional
@@ -11,72 +10,74 @@ from pydantic import EmailStr
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Content
 
+# IMPORTANT: use the shared email settings loader
+from backend_v2.email.config import get_email_settings
 
 logger = logging.getLogger("the13th.backend_v2.email.service")
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
 
+# ---------------------------------------------------------------------------
+# Local dataclass kept for compatibility (not used to read env directly)
+# ---------------------------------------------------------------------------
+
+
 @dataclass
-class EmailSettings:
-    """Environment-driven email configuration for THE13TH."""
+class EmailSettingsCompat:
+    """Compatibility holder for email settings used by this service layer."""
 
     sendgrid_api_key: str
     from_email: EmailStr
     from_name: str
     admin_email: Optional[EmailStr]
 
-    @classmethod
-    def from_env(cls) -> "EmailSettings":
-        """
-        Required:
-            SENDGRID_API_KEY
-            EMAIL_FROM           e.g. pilot@the13thhq.com
 
-        Optional:
-            EMAIL_FROM_NAME      default: "THE13TH Pilot Desk"
-            EMAIL_ADMIN          where admin notifications are sent
-        """
-        missing: list[str] = []
+def _get_settings() -> Optional[EmailSettingsCompat]:
+    """
+    Load email settings from backend_v2.email.config.
 
-        api_key = os.getenv("SENDGRID_API_KEY")
-        if not api_key:
-            missing.append("SENDGRID_API_KEY")
-
-        from_email = os.getenv("EMAIL_FROM")
-        if not from_email:
-            missing.append("EMAIL_FROM")
-
-        if missing:
-            raise RuntimeError(
-                f"Missing required email environment variables: {', '.join(missing)}"
-            )
-
-        from_name = os.getenv("EMAIL_FROM_NAME", "THE13TH Pilot Desk")
-        admin_email = os.getenv("EMAIL_ADMIN")
-
-        email_obj = EmailStr(from_email)
-
-        return cls(
-            sendgrid_api_key=api_key,
-            from_email=email_obj,
-            from_name=from_name,
-            admin_email=EmailStr(admin_email) if admin_email else None,
-        )
-
-
-def _init_settings() -> Optional[EmailSettings]:
+    This wraps get_email_settings() so service.py always uses the single
+    central configuration source, which is already initialised at startup.
+    """
     try:
-        settings = EmailSettings.from_env()
-    except Exception as exc:  # defensive
-        logger.error("EmailSettings failed to initialise: %s", exc, exc_info=True)
+        raw = get_email_settings()
+    except Exception as exc:  # defensive: misconfigured env etc.
+        logger.error("Failed to load EmailSettings: %s", exc, exc_info=True)
         return None
 
-    logger.info("EmailSettings initialised for %s", settings.from_email)
-    return settings
+    # Be tolerant of different attribute naming conventions.
+    sendgrid_api_key = (
+        getattr(raw, "sendgrid_api_key", None)
+        or getattr(raw, "SENDGRID_API_KEY", None)
+    )
+    from_email = (
+        getattr(raw, "from_email", None)
+        or getattr(raw, "EMAIL_FROM", None)
+    )
+    from_name = (
+        getattr(raw, "from_name", None)
+        or getattr(raw, "EMAIL_FROM_NAME", None)
+        or "THE13TH Pilot Desk"
+    )
+    admin_email = (
+        getattr(raw, "admin_email", None)
+        or getattr(raw, "EMAIL_ADMIN", None)
+    )
 
+    if not sendgrid_api_key or not from_email:
+        logger.error(
+            "Email settings incomplete (SENDGRID_API_KEY or EMAIL_FROM missing); "
+            "emails will be skipped."
+        )
+        return None
 
-SETTINGS: Optional[EmailSettings] = _init_settings()
+    return EmailSettingsCompat(
+        sendgrid_api_key=sendgrid_api_key,
+        from_email=EmailStr(str(from_email)),
+        from_name=str(from_name),
+        admin_email=EmailStr(str(admin_email)) if admin_email else None,
+    )
 
 
 def _init_jinja() -> Optional[Environment]:
@@ -138,12 +139,17 @@ def _send_email(
     Never raises to the caller; failures are logged as errors so the
     pilot flow keeps running even if email fails.
     """
-    if SETTINGS is None:
-        logger.error("Email SETTINGS is not initialised; skipping send to %s", to_email)
+    settings = _get_settings()
+    if settings is None:
+        logger.error(
+            "Email settings not available; skipping send to %s (subject=%s)",
+            to_email,
+            subject,
+        )
         return
 
     message = Mail(
-        from_email=(SETTINGS.from_email, SETTINGS.from_name),
+        from_email=(settings.from_email, settings.from_name),
         to_emails=to_email,
         subject=subject,
         html_content=html_body,
@@ -157,7 +163,7 @@ def _send_email(
         message.cc = cc
 
     try:
-        client = SendGridAPIClient(SETTINGS.sendgrid_api_key)
+        client = SendGridAPIClient(settings.sendgrid_api_key)
         response = client.send(message)
     except Exception as exc:  # network / API errors
         logger.error(
@@ -244,14 +250,17 @@ def send_pilot_confirmation(pilot_request: Any) -> None:
 
 def send_admin_pilot_notification(pilot_request: Any) -> None:
     """Send internal notification to THE13TH admin when a pilot is requested."""
-    if SETTINGS is None or not SETTINGS.admin_email:
+    settings = _get_settings()
+    admin_email = settings.admin_email if settings else None
+
+    if not admin_email:
         logger.warning(
             "Admin email not configured; skipping admin pilot notification for %r",
             pilot_request,
         )
         return
 
-    to_email = str(SETTINGS.admin_email)
+    to_email = str(admin_email)
     full_name = _safe_attr(pilot_request, "contact_name") or _safe_attr(
         pilot_request, "full_name"
     )

@@ -10,8 +10,8 @@ from pydantic import EmailStr
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Content
 
-# IMPORTANT: use the shared email settings loader
-from backend_v2.email.config import get_email_settings
+# Use the central email config module
+from backend_v2.email import config as email_config
 
 logger = logging.getLogger("the13th.backend_v2.email.service")
 
@@ -19,88 +19,85 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
 
 # ---------------------------------------------------------------------------
-# Local dataclass kept for compatibility (not used to read env directly)
+# Settings loader
 # ---------------------------------------------------------------------------
-
 
 @dataclass
 class EmailSettingsCompat:
-    """Compatibility holder for email settings used by this service layer."""
-
     sendgrid_api_key: str
     from_email: EmailStr
     from_name: str
-    admin_email: Optional[EmailStr]
+    admin_email: Optional[EmailStr] = None
 
 
 def _get_settings() -> Optional[EmailSettingsCompat]:
     """
     Load email settings from backend_v2.email.config.
 
-    This wraps get_email_settings() so service.py always uses the single
-    central configuration source, which is already initialised at startup.
+    Expects email_config to expose an 'email_settings' instance with:
+    - sendgrid_api_key
+    - from_email
+    - from_name (optional)
+    - admin_email (optional)
     """
-    try:
-        raw = get_email_settings()
-    except Exception as exc:  # defensive: misconfigured env etc.
-        logger.error("Failed to load EmailSettings: %s", exc, exc_info=True)
+    raw = getattr(email_config, "email_settings", None)
+
+    if raw is None:
+        logger.error(
+            "backend_v2.email.config.email_settings is not initialised; "
+            "emails will be skipped."
+        )
         return None
 
-    # Be tolerant of different attribute naming conventions.
-    sendgrid_api_key = (
-        getattr(raw, "sendgrid_api_key", None)
-        or getattr(raw, "SENDGRID_API_KEY", None)
-    )
-    from_email = (
-        getattr(raw, "from_email", None)
-        or getattr(raw, "EMAIL_FROM", None)
-    )
-    from_name = (
-        getattr(raw, "from_name", None)
-        or getattr(raw, "EMAIL_FROM_NAME", None)
-        or "THE13TH Pilot Desk"
-    )
-    admin_email = (
-        getattr(raw, "admin_email", None)
-        or getattr(raw, "EMAIL_ADMIN", None)
-    )
+    sendgrid_api_key = getattr(raw, "sendgrid_api_key", None)
+    from_email = getattr(raw, "from_email", None)
+    from_name = getattr(raw, "from_name", None) or "THE13TH Pilot Desk"
+    admin_email = getattr(raw, "admin_email", None)
 
     if not sendgrid_api_key or not from_email:
         logger.error(
-            "Email settings incomplete (SENDGRID_API_KEY or EMAIL_FROM missing); "
+            "Email settings incomplete (sendgrid_api_key or from_email missing); "
             "emails will be skipped."
         )
         return None
 
     return EmailSettingsCompat(
-        sendgrid_api_key=sendgrid_api_key,
+        sendgrid_api_key=str(sendgrid_api_key),
         from_email=EmailStr(str(from_email)),
         from_name=str(from_name),
         admin_email=EmailStr(str(admin_email)) if admin_email else None,
     )
 
 
+# ---------------------------------------------------------------------------
+# Jinja environment
+# ---------------------------------------------------------------------------
+
 def _init_jinja() -> Optional[Environment]:
     if not TEMPLATES_DIR.exists():
         logger.error("Email templates directory does not exist: %s", TEMPLATES_DIR)
         return None
 
-    env = Environment(
+    return Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
         autoescape=select_autoescape(["html", "xml"]),
         enable_async=False,
     )
-    return env
 
 
 JINJA_ENV: Optional[Environment] = _init_jinja()
 
 
 def _render_template(template_name: str, context: Mapping[str, Any]) -> str:
+    """
+    Render a template but never raise; fall back to a plain-text body on error.
+    """
     if JINJA_ENV is None:
-        raise RuntimeError(
+        logger.error(
             "Jinja environment is not initialised; templates directory missing"
         )
+        # Fallback so routes never blow up
+        return f"{template_name} – plain text fallback\n\n{context}"
 
     try:
         template = JINJA_ENV.get_template(template_name)
@@ -111,19 +108,23 @@ def _render_template(template_name: str, context: Mapping[str, Any]) -> str:
             exc,
             exc_info=True,
         )
-        raise
+        return f"{template_name} – plain text fallback\n\n{context}"
 
     try:
         return template.render(**context)
-    except Exception as exc:  # defensive
+    except Exception as exc:
         logger.error(
             "Failed to render email template %s: %s",
             template_name,
             exc,
             exc_info=True,
         )
-        raise
+        return f"{template_name} – plain text fallback\n\n{context}"
 
+
+# ---------------------------------------------------------------------------
+# Core SendGrid send
+# ---------------------------------------------------------------------------
 
 def _send_email(
     *,
@@ -159,13 +160,12 @@ def _send_email(
         message.add_content(Content("text/plain", plain_body))
 
     if cc:
-        # Mail.cc expects a list of email strings
         message.cc = cc
 
     try:
         client = SendGridAPIClient(settings.sendgrid_api_key)
         response = client.send(message)
-    except Exception as exc:  # network / API errors
+    except Exception as exc:
         logger.error(
             "Failed to send email via SendGrid to %s: %s",
             to_email,
@@ -174,21 +174,28 @@ def _send_email(
         )
         return
 
-    if response.status_code >= 400:
+    status = getattr(response, "status_code", None)
+    body = getattr(response, "body", b"")[:1000]
+
+    if status is None or status >= 400:
         logger.error(
             "SendGrid responded with error for %s: status=%s body=%s",
             to_email,
-            response.status_code,
-            getattr(response, "body", b"")[:1000],
+            status,
+            body,
         )
     else:
         logger.info(
             "Email sent successfully: to=%s subject=%s status=%s",
             to_email,
             subject,
-            response.status_code,
+            status,
         )
 
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _safe_attr(obj: Any, name: str, default: Any = "") -> Any:
     """Return attribute or dict key, tolerant of different payload types."""
@@ -201,10 +208,9 @@ def _safe_attr(obj: Any, name: str, default: Any = "") -> Any:
     return default
 
 
-# ============================================================
+# ---------------------------------------------------------------------------
 # Public email functions used by the rest of backend_v2
-# ============================================================
-
+# ---------------------------------------------------------------------------
 
 def send_pilot_confirmation(pilot_request: Any) -> None:
     """Send confirmation email to the brokerage that submitted a pilot request."""
@@ -357,7 +363,7 @@ def send_pilot_summary_email(pilot: Any, summary_context: Mapping[str, Any]) -> 
     """
     Send the 7-day pilot summary + recommendations.
 
-    Wired for future use; safe even if not yet invoked.
+    Safe even if templates or settings are misconfigured.
     """
     to_email = _safe_attr(pilot, "contact_email") or _safe_attr(pilot, "email")
     full_name = _safe_attr(pilot, "contact_name") or _safe_attr(pilot, "full_name")

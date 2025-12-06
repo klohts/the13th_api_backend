@@ -80,8 +80,7 @@ class Pilot(PilotBase, table=True):
     """
     Pilot request record for THE13TH paid pilot workflow.
 
-    Uses a dedicated table name 'pilot_requests' to avoid clashing with
-    any legacy tables or future analytics tables.
+    Uses table name 'pilot_requests' to match existing queries.
     """
 
     __tablename__ = "pilot_requests"
@@ -89,7 +88,7 @@ class Pilot(PilotBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
 
-def touch_pilot_for_update(pilot: Pilot) -> None:
+def touch_pilot_for_update(pilot: "Pilot") -> None:
     """
     Helper to update the `updated_at` timestamp safely.
     Should be called before any commit that mutates a Pilot row.

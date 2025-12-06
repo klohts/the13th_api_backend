@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>THE13TH · Admin Leads</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <style>
+        :root {
+            --bg-gradient-start: #4b0082;
+            --bg-gradient-end: #0a0014;
+            --card-bg: rgba(12, 8, 29, 0.82);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --accent: #f97316;
+            --accent-soft: rgba(249, 115, 22, 0.12);
+            --text-main: #f9fafb;
+            --text-muted: #9ca3af;
+            --text-soft: #d1d5db;
+            --danger: #f97373;
+            --pill-bg: rgba(17, 24, 39, 0.8);
+            --shadow-soft: 0 24px 80px rgba(0, 0, 0, 0.65);
+            --radius-xl: 24px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                "Inter", sans-serif;
+            background: radial-gradient(circle at top, var(--bg-gradient-start) 0%, #000 32%, var(--bg-gradient-end) 80%);
+            color: var(--text-main);
+            display: flex;
+            align-items: stretch;
+            justify-content: center;
+        }
+
+        .page-shell {
+            width: 100%;
+            max-width: 1320px;
+            padding: 32px 20px 40px;
+        }
+
+        header {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        header .top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .brand-lockup {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 999px;
+            background: conic-gradient(
+                from 210deg,
+                #f97316,
+                #ec4899,
+                #8b5cf6,
+                #22d3ee,
+                #f97316
+            );
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.7);
+        }
+
+        .brand-icon span {
+            font-size: 22px;
+            font-weight: 700;
+            color: #0b0213;
+        }
+
+        .brand-copy h1 {
+            font-size: 1.4rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin: 0 0 4px;
+            color: var(--text-soft);
+        }
+
+        .brand-copy p {
+            margin: 0;
+            font-size: 0.96rem;
+            color: var(--text-muted);
+        }
+
+        .top-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pill {
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: var(--pill-bg);
+            color: var(--text-soft);
+            font-size: 0.78rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+        }
+
+        .primary-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 16px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #a855f7, #ec4899);
+            color: #fdf2f8;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-decoration: none;
+            box-shadow: 0 16px 40px rgba(76, 29, 149, 0.7);
+        }
+
+        .primary-link span.icon {
+            font-size: 1.1rem;
+        }
+
+        header .subtitle {
+            font-size: 0.98rem;
+            color: var(--text-muted);
+            max-width: 640px;
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: minmax(0, 1.25fr) minmax(0, 2fr);
+            gap: 20px;
+        }
+
+        @media (max-width: 960px) {
+            main {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+
+        .card {
+            background: radial-gradient(circle at top left, rgba(148, 163, 184, 0.18), transparent 52%),
+                radial-gradient(circle at bottom right, rgba(248, 250, 252, 0.12), transparent 58%),
+                var(--card-bg);
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--card-border);
+            box-shadow: var(--shadow-soft);
+            padding: 18px 18px 16px;
+            backdrop-filter: blur(20px);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .card-title {
+            font-size: 0.98rem;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--text-soft);
+        }
+
+        .card-subtitle {
+            font-size: 0.86rem;
+            color: var(--text-muted);
+        }
+
+        .pill-metric {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 4px;
+            padding: 6px 11px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            font-size: 0.8rem;
+        }
+
+        .pill-metric strong {
+            font-size: 0.95rem;
+        }
+
+        .grid-kpis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+        }
+
+        .kpi-tile {
+            padding: 10px 12px;
+            border-radius: 16px;
+            background: rgba(15, 23, 42, 0.92);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+        }
+
+        .kpi-label {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .kpi-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-soft);
+        }
+
+        .kpi-meta {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .group-title {
+            font-size: 0.82rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: var(--text-muted);
+            margin: 14px 0 6px;
+        }
+
+        .badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .badge {
+            padding: 6px 9px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            font-size: 0.78rem;
+            color: var(--text-soft);
+            display: inline-flex;
+            align-items: baseline;
+            gap: 5px;
+        }
+
+        .badge span.count {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* Table */
+
+        .table-shell {
+            border-radius: var(--radius-xl);
+            overflow: hidden;
+            border: 1px solid var(--card-border);
+            background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.86), rgba(3, 7, 18, 0.98));
+            box-shadow: var(--shadow-soft);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.86rem;
+        }
+
+        thead {
+            background: linear-gradient(
+                135deg,
+                rgba(88, 28, 135, 0.88),
+                rgba(17, 24, 39, 0.95)
+            );
+        }
+
+        thead th {
+            padding: 10px 12px;
+            text-align: left;
+            font-size: 0.78rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: rgba(249, 250, 251, 0.86);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+        }
+
+        tbody tr:nth-child(even) {
+            background: rgba(15, 23, 42, 0.96);
+        }
+
+        tbody tr:nth-child(odd) {
+            background: rgba(15, 23, 42, 0.86);
+        }
+
+        tbody tr:hover {
+            background: rgba(22, 35, 64, 0.98);
+        }
+
+        tbody td {
+            padding: 8px 12px;
+            color: var(--text-soft);
+            border-bottom: 1px solid rgba(15, 23, 42, 0.9);
+            vertical-align: top;
+        }
+
+        .cell-muted {
+            color: var(--text-muted);
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 9px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            background: rgba(15, 23, 42, 0.96);
+        }
+
+        .status-pill[data-status="new"] {
+            border-color: rgba(52, 211, 153, 0.6);
+            color: #6ee7b7;
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+                "Liberation Mono", "Courier New", monospace;
+            font-size: 0.8rem;
+        }
+
+        .ellipsis {
+            max-width: 210px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .empty-state {
+            padding: 14px 12px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+<div class="page-shell">
+    <header>
+        <div class="top-row">
+            <div class="brand-lockup">
+                <div class="brand-icon">
+                    <span>13</span>
+                </div>
+                <div class="brand-copy">
+                    <h1>THE13TH · Admin Leads</h1>
+                    <p>Real-time view of every lead flowing through your ingestion layer.</p>
+                </div>
+            </div>
+            <div class="top-actions">
+                <div class="pill">
+                    LIVE INGESTION ·
+                    <strong>{{ total_leads }} lead{% if total_leads != 1 %}s{% endif %}</strong>
+                </div>
+                <a class="primary-link" href="/admin/pilots/">
+                    <span class="icon">↩</span>
+                    <span>Pilot Command Center</span>
+                </a>
+            </div>
+        </div>
+        <p class="subtitle">
+            Watch lead intake by brokerage and source, validate real-time ingestion,
+            and spot issues before they become revenue leakage.
+        </p>
+    </header>
+
+    <main>
+        <section class="card">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">Lead Intake Overview</div>
+                    <div class="card-subtitle">
+                        Canonical view of leads by tenant and source.
+                    </div>
+                </div>
+                <div class="pill-metric">
+                    <strong>{{ total_leads }}</strong>
+                    <span>total leads ingested</span>
+                </div>
+            </div>
+
+            <div class="grid-kpis">
+                <div class="kpi-tile">
+                    <div class="kpi-label">Tenants with traffic</div>
+                    <div class="kpi-value">
+                        {{ leads_by_tenant|length }}
+                    </div>
+                    <div class="kpi-meta">
+                        Unique <span class="mono">tenant_key</span> values.
+                    </div>
+                </div>
+                <div class="kpi-tile">
+                    <div class="kpi-label">Active sources</div>
+                    <div class="kpi-value">
+                        {{ leads_by_source|length }}
+                    </div>
+                    <div class="kpi-meta">
+                        Distinct <span class="mono">source</span> identifiers.
+                    </div>
+                </div>
+                <div class="kpi-tile">
+                    <div class="kpi-label">Average per tenant</div>
+                    <div class="kpi-value">
+                        {% if leads_by_tenant|length > 0 %}
+                            {{ "%.1f"|format(total_leads / (leads_by_tenant|length)) }}
+                        {% else %}
+                            0.0
+                        {% endif %}
+                    </div>
+                    <div class="kpi-meta">
+                        Leads / active tenant.
+                    </div>
+                </div>
+            </div>
+
+            <div class="group-title">By Tenant</div>
+            {% if leads_by_tenant %}
+                <div class="badge-row">
+                    {% for tenant, count in leads_by_tenant.items() %}
+                        <div class="badge">
+                            <span class="mono ellipsis" title="{{ tenant }}">{{ tenant }}</span>
+                            <span class="count">{{ count }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    No tenants have ingested leads yet.
+                </div>
+            {% endif %}
+
+            <div class="group-title" style="margin-top: 10px;">By Source</div>
+            {% if leads_by_source %}
+                <div class="badge-row">
+                    {% for source, count in leads_by_source.items() %}
+                        <div class="badge">
+                            <span class="mono">{{ source }}</span>
+                            <span class="count">{{ count }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    No sources have sent traffic yet.
+                </div>
+            {% endif %}
+        </section>
+
+        <section class="card">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">Latest Ingested Leads</div>
+                    <div class="card-subtitle">
+                        Most recent leads across all tenants and sources.
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-shell">
+                {% if leads %}
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Tenant</th>
+                            <th>Source</th>
+                            <th>Lead</th>
+                            <th>Contact</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for lead in leads %}
+                            <tr>
+                                <td class="mono">#{{ lead.id }}</td>
+                                <td class="mono ellipsis" title="{{ lead.tenant_key or 'Unassigned' }}">
+                                    {{ lead.tenant_key or "Unassigned" }}
+                                </td>
+                                <td class="mono">{{ lead.source }}</td>
+                                <td>
+                                    <div class="ellipsis" title="{{ lead.full_name or 'Unnamed Lead' }}">
+                                        {{ lead.full_name or "Unnamed Lead" }}
+                                    </div>
+                                    {% if lead.external_id %}
+                                        <div class="cell-muted mono ellipsis" title="{{ lead.external_id }}">
+                                            #{{ lead.external_id }}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if lead.email %}
+                                        <div class="mono ellipsis" title="{{ lead.email }}">
+                                            {{ lead.email }}
+                                        </div>
+                                    {% endif %}
+                                    {% if lead.phone %}
+                                        <div class="cell-muted mono ellipsis" title="{{ lead.phone }}">
+                                            {{ lead.phone }}
+                                        </div>
+                                    {% endif %}
+                                    {% if not lead.email and not lead.phone %}
+                                        <span class="cell-muted">No contact details</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="status-pill" data-status="{{ lead.status|lower }}">
+                                        {{ lead.status|upper }}
+                                    </span>
+                                </td>
+                                <td class="mono cell-muted">
+                                    {{ lead.created_at.strftime("%Y-%m-%d %H:%M:%S") }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="empty-state">
+                        No leads ingested yet. Connect a source and send a test event.
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+    </main>
+</div>
+</body>
+</html>

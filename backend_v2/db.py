@@ -1,66 +1,55 @@
+from __future__ import annotations
+
 import logging
-from typing import Any, Generator
+from typing import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
+from sqlmodel import SQLModel
 
 from backend_v2.config import settings
 
-logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------
-# Declarative Base
-# ---------------------------------------------------------
-Base = declarative_base()
+logger = logging.getLogger("the13th.backend_v2.db")
 
 
 def _create_engine() -> Engine:
     """
-    Create and return the SQLAlchemy engine using settings.database_url.
-    Handles SQLite vs others and enables pool_pre_ping.
+    Create the SQLAlchemy engine based on DATABASE_URL.
+    Handles SQLite vs non-SQLite differences.
     """
-    database_url: str = settings.database_url
+    database_url = settings.database_url
+    connect_args = {}
 
-    if not database_url:
-        logger.critical("DATABASE_URL / database_url is empty in settings.")
-        raise RuntimeError("DATABASE_URL / database_url is not configured")
-
-    connect_args: dict[str, Any] = {}
     if database_url.startswith("sqlite"):
+        # Needed for SQLite when used in multi-threaded FastAPI context
         connect_args["check_same_thread"] = False
 
-    engine: Engine = create_engine(
+    engine = create_engine(
         database_url,
         echo=settings.debug,
         future=True,
-        pool_pre_ping=True,
         connect_args=connect_args,
     )
-
-    logger.info("Database engine created for URL: %s", database_url)
+    logger.info("Database engine created for %s", database_url)
     return engine
 
 
-# Global engine + session factory
 engine: Engine = _create_engine()
 
+# Session factory
 SessionLocal = sessionmaker(
-    bind=engine,
-    class_=Session,
     autocommit=False,
     autoflush=False,
-    future=True,
+    bind=engine,
+    class_=Session,
 )
 
 
-def get_db() -> Generator[Session, None, None]:
+def get_session() -> Generator[Session, None, None]:
     """
-    FastAPI dependency that yields a DB session and guarantees cleanup.
-
-    Usage:
-        def endpoint(db: Session = Depends(get_db)):
-            ...
+    FastAPI dependency that yields a database session and
+    makes sure it is closed afterwards.
     """
     db: Session = SessionLocal()
     try:
@@ -69,26 +58,24 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-def get_session() -> Generator[Session, None, None]:
-    """
-    Backwards-compatible alias for get_db, for modules that still import
-    `get_session` from backend_v2.db.
-    """
-    # Delegate to get_db's generator so teardown logic still runs.
-    yield from get_db()
+# Alias used by some routers
+get_db = get_session
+
+# Backwards-compatible Base alias; models can inherit from this if needed.
+Base = SQLModel
 
 
 def init_db() -> None:
     """
-    Import all ORM models and create tables if they do not exist.
+    Import all model modules and create tables.
 
-    This should be called once on startup (e.g. in main.py).
-    Import happens here (not at module import) to avoid circular imports.
+    Uses SQLModel.metadata so all SQLModel-based tables
+    (Lead, Pilot, etc.) are created in the same metadata.
     """
-    import backend_v2.models  # noqa: F401
+    import backend_v2.models  # noqa: F401  # ensures models are imported
 
-    logger.info("Ensuring database tables exist via Base.metadata.create_all()")
-    Base.metadata.create_all(bind=engine)
+    logger.info("Ensuring database tables exist via SQLModel.metadata.create_all()")
+    SQLModel.metadata.create_all(bind=engine)
     logger.info("Database tables ensured.")
 
 

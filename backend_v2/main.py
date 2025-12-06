@@ -22,6 +22,7 @@ import backend_v2.routers.pilot_admin as pilot_admin_router
 import backend_v2.routers.pilot_request as pilot_request_router
 import backend_v2.routers.stripe_webhooks as stripe_webhooks_router
 from backend_v2.services.render import STATIC_DIR
+import backend_v2.routers.admin_leads as admin_leads_router
 
 # Load env early
 load_dotenv()
@@ -60,7 +61,8 @@ def create_app() -> FastAPI:
     app.include_router(pilot_admin_router.router)
     app.include_router(stripe_webhooks_router.router)
     app.include_router(ingestion_router.router)
-
+    app.include_router(admin_leads_router.router)
+    
     # Static
     STATIC_DIR.mkdir(parents=True, exist_ok=True)
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

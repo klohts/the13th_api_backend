@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Mapping, Optional
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from pydantic import EmailStr
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Content
 
@@ -26,9 +25,9 @@ class EmailSettingsCompat:
     def __init__(
         self,
         sendgrid_api_key: str,
-        from_email: EmailStr,
+        from_email: str,
         from_name: str,
-        admin_email: Optional[EmailStr] = None,
+        admin_email: Optional[str] = None,
     ) -> None:
         self.sendgrid_api_key = sendgrid_api_key
         self.from_email = from_email
@@ -62,8 +61,6 @@ def _load_raw_settings() -> Optional[Any]:
     - email_settings attribute (preferred)
     - get_email_settings() function
     - EmailSettings() class constructor
-
-    If all fail, returns None and we'll fall back to env-only.
     """
     raw = getattr(email_config, "email_settings", None)
     if raw is not None:
@@ -102,13 +99,9 @@ def _load_raw_settings() -> Optional[Any]:
 def _get_settings() -> Optional[EmailSettingsCompat]:
     """
     Load email settings from backend_v2.email.config, with env fallbacks.
-
-    Even if the config module doesn't expose email_settings, this will still
-    try environment variables so we don't hard-fail.
     """
     raw = _load_raw_settings()
 
-    # These getattr() calls are safe even if raw is None.
     sendgrid_api_key = _first_non_empty(
         getattr(raw, "sendgrid_api_key", None),
         getattr(raw, "SENDGRID_API_KEY", None),
@@ -152,9 +145,9 @@ def _get_settings() -> Optional[EmailSettingsCompat]:
 
     return EmailSettingsCompat(
         sendgrid_api_key=sendgrid_api_key,
-        from_email=EmailStr(from_email),
+        from_email=str(from_email),
         from_name=str(from_name),
-        admin_email=EmailStr(admin_email) if admin_email else None,
+        admin_email=str(admin_email) if admin_email else None,
     )
 
 

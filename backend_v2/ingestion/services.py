@@ -1,13 +1,16 @@
+# backend_v2/ingestion/services.py
 import csv
 import io
 import logging
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, Optional
 
 from sqlalchemy.orm import Session
 
 from backend_v2.ingestion.config import ingestion_settings
 from backend_v2.ingestion.schemas import LeadWebhookPayload
 from backend_v2.models.lead import Lead
+from backend_v2.models.ingestion_event import IngestionEvent
+from backend_v2.automation.lead_automation import maybe_trigger_first_touch_email
 
 logger = logging.getLogger("backend_v2.ingestion.services")
 
@@ -23,7 +26,6 @@ class AuthenticationError(IngestionError):
 def _validate_api_key(api_key: Optional[str]) -> None:
     """Validate the provided API key against configured ingestion keys."""
     if not ingestion_settings.ingestion_api_keys:
-        # If no keys configured, accept everything but log loudly.
         logger.warning(
             "INGESTION_API_KEYS not configured. Accepting webhook without API key restriction."
         )
@@ -36,23 +38,43 @@ def _validate_api_key(api_key: Optional[str]) -> None:
         raise AuthenticationError("Invalid ingestion API key.")
 
 
+def _log_ingestion_event(
+    db: Session,
+    *,
+    tenant_key: Optional[str],
+    source: str,
+    channel: str,
+    status: str,
+    message: str,
+    lead_id: Optional[int] = None,
+    raw_payload: Optional[Dict] = None,
+) -> IngestionEvent:
+    event = IngestionEvent(
+        tenant_key=tenant_key,
+        source=source,
+        channel=channel,
+        status=status,
+        message=message,
+        lead_id=lead_id,
+        raw_payload=raw_payload or {},
+    )
+    db.add(event)
+    return event
+
+
 def ingest_lead_from_webhook(
     payload: LeadWebhookPayload,
     db: Session,
     api_key: Optional[str],
 ) -> Lead:
-    """
-    Ingest a single lead from a webhook payload.
-
-    - Validates API key
-    - Normalizes payload into Lead model
-    - Persists to database
-    """
+    """Ingest a single lead from a webhook payload with logging + automation."""
     _validate_api_key(api_key)
+
+    source = payload.source.lower().strip()
 
     lead = Lead(
         tenant_key=payload.tenant_key,
-        source=payload.source.lower().strip(),
+        source=source,
         full_name=payload.full_name,
         email=payload.email,
         phone=payload.phone,
@@ -63,6 +85,21 @@ def ingest_lead_from_webhook(
     )
 
     db.add(lead)
+    db.flush()  # assign PK for logging and automation
+
+    _log_ingestion_event(
+        db,
+        tenant_key=payload.tenant_key,
+        source=source,
+        channel="webhook",
+        status="success",
+        message="Lead ingested via webhook.",
+        lead_id=lead.id,
+        raw_payload=payload.raw_payload or {},
+    )
+
+    maybe_trigger_first_touch_email(lead, db)
+
     db.commit()
     db.refresh(lead)
 
@@ -78,15 +115,7 @@ def ingest_lead_from_webhook(
 
 
 def _normalize_csv_row(row: Dict[str, str]) -> Dict[str, Optional[str]]:
-    """Normalize a CSV row into canonical lead fields.
-
-    Attempts to map common column name variants for:
-    - full_name
-    - email
-    - phone
-    - assigned_agent
-    - external_id
-    """
+    """Normalize a CSV row into canonical lead fields."""
     lower_keys = {k.lower().strip(): k for k in row.keys()}
 
     def pick(*candidates: str) -> Optional[str]:
@@ -117,13 +146,7 @@ def ingest_leads_from_csv_content(
     tenant_key: Optional[str],
     default_source: str = "csv_import",
 ) -> Dict[str, int]:
-    """Ingest leads from a CSV file.
-
-    - Parses CSV from bytes
-    - Normalizes rows
-    - Persists as Lead records
-    - Returns counts for reporting
-    """
+    """Ingest leads from a CSV file with activity logging and automation."""
     max_bytes = ingestion_settings.max_csv_size_mb * 1024 * 1024
     if len(file_bytes) > max_bytes:
         raise IngestionError(
@@ -133,25 +156,33 @@ def ingest_leads_from_csv_content(
     try:
         text_stream = io.StringIO(file_bytes.decode("utf-8-sig"))
     except UnicodeDecodeError:
-        # Fallback to latin-1 if UTF-8 fails
         text_stream = io.StringIO(file_bytes.decode("latin-1"))
 
     reader: Iterable[Dict[str, str]] = csv.DictReader(text_stream)
     total_rows = 0
     ingested_rows = 0
+    source = default_source.lower().strip()
 
     for row in reader:
         total_rows += 1
         normalized = _normalize_csv_row(row)
 
-        # Skip empty rows (no useful data)
         if not any(normalized.values()):
             logger.debug("Skipping empty CSV row: %s", row)
+            _log_ingestion_event(
+                db,
+                tenant_key=tenant_key,
+                source=source,
+                channel="csv",
+                status="skipped",
+                message="Row skipped: no mappable lead fields.",
+                raw_payload=row,
+            )
             continue
 
         lead = Lead(
             tenant_key=tenant_key,
-            source=default_source.lower().strip(),
+            source=source,
             full_name=normalized["full_name"],
             email=normalized["email"],
             phone=normalized["phone"],
@@ -161,6 +192,21 @@ def ingest_leads_from_csv_content(
             raw_payload=row,
         )
         db.add(lead)
+        db.flush()
+
+        _log_ingestion_event(
+            db,
+            tenant_key=tenant_key,
+            source=source,
+            channel="csv",
+            status="success",
+            message="Lead ingested via CSV.",
+            lead_id=lead.id,
+            raw_payload=row,
+        )
+
+        maybe_trigger_first_touch_email(lead, db)
+
         ingested_rows += 1
 
     db.commit()
@@ -170,7 +216,7 @@ def ingest_leads_from_csv_content(
     logger.info(
         "CSV ingest completed (tenant=%s, source=%s, total=%s, ingested=%s, skipped=%s)",
         tenant_key,
-        default_source,
+        source,
         total_rows,
         ingested_rows,
         skipped_rows,

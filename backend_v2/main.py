@@ -20,6 +20,7 @@ from backend_v2.api import pilot as pilot_api
 from backend_v2.routers import ingestion as ingestion_router
 from backend_v2.routers import demo_experience as demo_experience_router
 from backend_v2.routers import admin_ingestion as admin_ingestion_router
+from .routers import leads  # import the router module
 
 
 import backend_v2.routers.pilot_admin as pilot_admin_router
@@ -36,6 +37,9 @@ logger = logging.getLogger("backend_v2.main")
 templates = Jinja2Templates(directory="backend_v2/templates")
 
 def create_app() -> FastAPI:
+    import backend_v2.routers.admin_ingestion as admin_ingestion_router
+    import backend_v2.routers.admin_lead_detail as admin_lead_detail_router
+    import backend_v2.routers.admin_automation as admin_automation_router
     app = FastAPI(title=settings.app_name, debug=settings.debug)
 
     # CORS
@@ -62,6 +66,7 @@ def create_app() -> FastAPI:
     app.include_router(tenant_router.router)
     app.include_router(client_experience_sim.router)
     app.include_router(demo_experience_router.router)
+    app.include_router(leads.router, prefix="/admin")
     
     app.include_router(pilot_api.router)
     app.include_router(pilot_admin_router.router)
@@ -69,6 +74,8 @@ def create_app() -> FastAPI:
     app.include_router(ingestion_router.router)
     app.include_router(admin_ingestion_router.router)
     app.include_router(admin_leads_router.router)
+    app.include_router(admin_lead_detail_router.router)
+    app.include_router(admin_automation_router.router)
     
     # Static
     STATIC_DIR.mkdir(parents=True, exist_ok=True)
@@ -87,4 +94,7 @@ def create_app() -> FastAPI:
     return app
 
 
+    app = create_app()
+
+# Expose ASGI app for Uvicorn
 app = create_app()

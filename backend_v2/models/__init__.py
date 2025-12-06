@@ -1,22 +1,23 @@
 from __future__ import annotations
 
-"""
-Models package for THE13TH backend_v2.
+from sqlalchemy.orm import declarative_base
 
-Imports and exposes ORM models so they are registered with SQLModel.metadata.
-"""
+Base = declarative_base()
 
-import logging
+# Core models
+from backend_v2.models.lead import Lead  # noqa: F401,E402
+from backend_v2.models.pilot import Pilot  # noqa: F401,E402
 
-from backend_v2.db import Base  # SQLModel alias, keeps external imports consistent
-from .lead import Lead  # noqa: F401
-from .pilot import Pilot, PilotStatus  # noqa: F401
-
-logger = logging.getLogger("the13th.backend_v2.models")
+# Ingestion / automation models
+from backend_v2.models.ingestion_event import IngestionEvent  # noqa: F401,E402
+from backend_v2.models.tenant_automation import TenantAutomationSettings  # noqa: F401,E402
+from backend_v2.models.automation_event import AutomationEvent  # noqa: F401,E402
 
 __all__ = [
     "Base",
     "Lead",
     "Pilot",
-    "PilotStatus",
+    "IngestionEvent",
+    "TenantAutomationSettings",
+    "AutomationEvent",
 ]

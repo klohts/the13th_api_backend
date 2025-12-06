@@ -1,0 +1,214 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Lead Journey · {{ lead.full_name or ("Lead #" ~ lead.id) }} · THE13TH Admin{% endblock %}
+
+{% block content %}
+<div class="px-10 py-8 space-y-8">
+  <!-- Top header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <p class="text-xs tracking-[0.3em] text-amber-300/70 uppercase">Lead journey</p>
+      <h1 class="mt-2 text-3xl font-semibold text-amber-50">
+        {{ lead.full_name or ("Lead #" ~ lead.id) }}
+      </h1>
+      <p class="mt-1 text-sm text-amber-200/70">
+        {{ lead.email or "—" }}{% if lead.phone %} · {{ lead.phone }}{% endif %}
+      </p>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <a
+        href="/admin/leads/{{ lead.id }}"
+        class="inline-flex items-center px-4 py-2 text-xs font-medium tracking-wide text-amber-200/80 uppercase rounded-full
+               border border-amber-500/40 hover:bg-amber-500/5 transition-colors duration-200"
+      >
+        ← Back to lead profile
+      </a>
+    </div>
+  </div>
+
+  <!-- Top summary cards -->
+  <div class="grid grid-cols-12 gap-6">
+    <!-- Source -->
+    <div class="col-span-12 md:col-span-4">
+      <div
+        class="relative overflow-hidden rounded-3xl border border-purple-500/40 bg-gradient-to-br from-purple-900/60 to-slate-950/90
+               shadow-[0_0_30px_rgba(129,140,248,0.35)]"
+      >
+        <div class="relative px-6 py-5 space-y-3">
+          <p class="text-xs tracking-[0.25em] text-amber-300/70 uppercase">Source</p>
+          <p class="text-lg font-semibold text-amber-50">
+            {{ lead.source or "Unknown" }}
+          </p>
+          <p class="text-[0.7rem] text-amber-200/70">
+            External ID: {{ lead.external_id or "—" }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Assignment -->
+    <div class="col-span-12 md:col-span-4">
+      <div
+        class="relative overflow-hidden rounded-3xl border border-purple-500/40 bg-gradient-to-br from-purple-900/60 to-slate-950/90
+               shadow-[0_0_30px_rgba(129,140,248,0.35)]"
+      >
+        <div class="relative px-6 py-5 space-y-3">
+          <p class="text-xs tracking-[0.25em] text-amber-300/70 uppercase">Assignment</p>
+          <p class="text-lg font-semibold text-amber-50">
+            {% if lead.assigned_agent %}
+              {{ lead.assigned_agent }}
+            {% else %}
+              Not yet assigned
+            {% endif %}
+          </p>
+          <p class="text-[0.7rem] text-amber-200/70">
+            Created · {{ lead.created_at or "—" }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Journey events summary -->
+    <div class="col-span-12 md:col-span-4">
+      <div
+        class="relative overflow-hidden rounded-3xl border border-purple-500/40 bg-gradient-to-br from-purple-900/60 to-slate-950/90
+               shadow-[0_0_30px_rgba(129,140,248,0.35)]"
+      >
+        <div class="relative px-6 py-5 space-y-3">
+          <p class="text-xs tracking-[0.25em] text-amber-300/70 uppercase">Journey events</p>
+          <div class="flex items-center gap-3">
+            <span
+              class="inline-flex items-center justify-center w-8 h-8 text-sm font-semibold text-emerald-300 rounded-full
+                     bg-emerald-500/15 border border-emerald-400/40"
+            >
+              {{ events_count or 0 }}
+            </span>
+            <div class="flex flex-wrap gap-1.5 text-[0.65rem]">
+              <span class="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-200 border border-amber-400/40">
+                Ingestion
+              </span>
+              <span class="px-2 py-0.5 rounded-full bg-fuchsia-500/10 text-fuchsia-200 border border-fuchsia-400/40">
+                Automation
+              </span>
+              <span class="px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-200 border border-sky-400/40">
+                Agent
+              </span>
+            </div>
+          </div>
+          <p class="text-[0.7rem] text-amber-200/70">
+            Every touch, from first ingestion to automation to human follow-up, will appear here.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Journey timeline + snapshot -->
+  <div class="grid grid-cols-12 gap-6">
+    <!-- Journey timeline -->
+    <div class="col-span-12 lg:col-span-8">
+      <div
+        class="relative overflow-hidden rounded-3xl border border-purple-500/40 bg-[radial-gradient(circle_at_top,_rgba(76,29,149,0.7),_rgba(10,0,20,0.98))]
+               shadow-[0_0_40px_rgba(147,51,234,0.4)]"
+      >
+        <div class="absolute inset-0 opacity-40 pointer-events-none"
+             style="background: radial-gradient(circle at 5% 0%, rgba(236, 72, 153, 0.4), transparent 55%),
+                              radial-gradient(circle at 100% 100%, rgba(251, 191, 36, 0.25), transparent 55%);">
+        </div>
+
+        <div class="relative px-8 py-6 space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs tracking-[0.25em] text-amber-300/70 uppercase">
+                Journey timeline
+              </p>
+              <h2 class="mt-1 text-lg font-semibold text-amber-50">
+                Every touch, from ingestion to automation
+              </h2>
+              <p class="mt-1 text-xs text-amber-200/70 max-w-xl">
+                As THE13TH ingests leads and runs intelligent email automation, every single event will be logged
+                here in strict chronological order. This becomes your ground truth audit trail.
+              </p>
+            </div>
+
+            <span
+              class="inline-flex items-center px-3 py-1 text-[0.65rem] font-semibold tracking-wide uppercase rounded-full
+                     bg-black/30 border border-amber-500/50 text-amber-200"
+            >
+              {{ events_count or 0 }} events logged
+            </span>
+          </div>
+
+          {% if (journey_events or []) | length == 0 %}
+            <div
+              class="mt-6 rounded-2xl border border-dashed border-amber-500/40 bg-black/30 px-5 py-6 text-sm text-amber-200/80"
+            >
+              <p class="font-medium text-amber-100">
+                No journey events have been logged for this lead yet.
+              </p>
+              <p class="mt-1 text-xs text-amber-200/70">
+                Once ingestion and automation run, each webhook hit, CSV import, email send, open, reply and agent
+                touch will appear here as a time-stamped event.
+              </p>
+            </div>
+          {% else %}
+            <ol class="mt-6 space-y-4">
+              {% for event in journey_events %}
+                <li class="relative pl-6">
+                  <div class="absolute left-0 top-2 h-full border-l border-amber-500/40"></div>
+                  <div class="absolute left-[-4px] top-2 w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.8)]"></div>
+
+                  <div class="rounded-2xl border border-purple-500/40 bg-black/30 px-4 py-3">
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="flex items-center gap-2">
+                        <span class="text-[0.65rem] uppercase tracking-wide text-amber-300/80">
+                          {{ event.type or "event" }}
+                        </span>
+                      </div>
+                      <span class="text-[0.65rem] text-amber-200/70">
+                        {{ event.occurred_at or event.created_at or "—" }}
+                      </span>
+                    </div>
+                    <p class="mt-1 text-sm text-amber-50">
+                      {{ event.summary or event.description or "—" }}
+                    </p>
+                    {% if event.meta %}
+                      <pre class="mt-2 text-[0.65rem] text-amber-200/80 whitespace-pre-wrap break-all font-mono">
+{{ event.meta | tojson(indent=2) }}
+                      </pre>
+                    {% endif %}
+                  </div>
+                </li>
+              {% endfor %}
+            </ol>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Lead snapshot card -->
+    <div class="col-span-12 lg:col-span-4">
+      <div
+        class="relative overflow-hidden rounded-3xl border border-purple-500/40 bg-[radial-gradient(circle_at_top,_rgba(15,23,42,0.85),_rgba(10,0,20,0.98))]
+               shadow-[0_0_40px_rgba(147,51,234,0.4)]"
+      >
+        <div class="absolute inset-0 opacity-40 pointer-events-none"
+             style="background: radial-gradient(circle at 0% 0%, rgba(236, 72, 153, 0.35), transparent 55%),
+                              radial-gradient(circle at 100% 100%, rgba(251, 191, 36, 0.25), transparent 55%);">
+        </div>
+
+        <div class="relative px-7 py-6 space-y-3">
+          <p class="text-xs tracking-[0.25em] text-amber-300/70 uppercase">Lead snapshot</p>
+
+          <dl class="space-y-2 text-sm">
+            <div>
+              <dt class="text-[0.7rem] uppercase tracking-wide text-amber-300/70">Name</dt>
+              <dd class="text-base text-amber-50">
+                {{ lead.full_name or ("Lead #" ~ lead.id) }}
+              </dd>
+            </div>
+
+            <div>
+              <dt class="text-[0.7rem] uppercase tracking-wide text-amber-300/70">Email</dt>
+              <dd class="text-sm text-amber-50"

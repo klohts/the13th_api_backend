@@ -473,3 +473,86 @@ def send_pilot_summary_email(
         subject=subject,
         html_body=html_body,
     )
+
+def send_lead_first_touch_email(
+    *,
+    to_email: str,
+    full_name: str,
+    tenant_key: str,
+    source: str,
+) -> None:
+    """Send the initial first-touch email to a new lead.
+
+    This uses the same underlying email settings as the pilot emails, but
+    keeps the body simple and on-brand for THE13TH.
+    """
+    # Import lazily to avoid circulars if any.
+    from email.utils import formataddr  # type: ignore[import]
+
+    try:
+        display_name = full_name or "there"
+    except Exception:
+        display_name = "there"
+
+    subject = "Thanks — we’ve received your inquiry"
+
+    html_body = f"""        <html>
+      <body style="margin:0;padding:0;background-color:#050010;">
+        <table width="100%" cellspacing="0" cellpadding="0" style="background:radial-gradient(circle at top left,#4b0082,#0a0014 60%);padding:24px 0;">
+          <tr>
+            <td align="center">
+              <table width="640" cellspacing="0" cellpadding="0" style="background-color:#050010;border-radius:24px;border:1px solid rgba(168,85,247,0.4);padding:32px 40px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e5e7eb;">
+                <tr>
+                  <td style="text-align:left;padding-bottom:24px;border-bottom:1px solid rgba(148,163,184,0.25);">
+                    <div style="font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:#e9d5ff;margin-bottom:12px;">Lead received</div>
+                    <div style="font-size:26px;font-weight:700;color:#FCE6C8;">
+                      Thanks, {display_name} — your inquiry is in.
+                    </div>
+                    <p style="font-size:13px;line-height:1.7;color:#e5e7eb;margin-top:16px;margin-bottom:0;">
+                      One of the agents on this brokerage is reviewing your details now. You&apos;ll get a follow-up shortly with next steps and a clear way to move forward.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding-top:24px;padding-bottom:8px;">
+                    <div style="font-size:11px;letter-spacing:0.25em;text-transform:uppercase;color:#c4b5fd;margin-bottom:12px;">What happens next</div>
+                    <ul style="padding-left:20px;margin:0;font-size:13px;line-height:1.7;color:#e5e7eb;">
+                      <li>You&apos;ll receive a reply from the brokerage team shortly.</li>
+                      <li>Your details are safely stored in their system, monitored by THE13TH.</li>
+                      <li>If you reply to this email, the team and THE13TH keep the conversation on track.</li>
+                    </ul>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding-top:24px;font-size:11px;color:#9ca3af;">
+                    <div style="margin-bottom:4px;">This inbox is assisted by THE13TH – AI Admin &amp; Revenue Intelligence.</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+    """  # noqa: E501
+
+    # Use the internal low-level sender to reuse existing settings + logging.
+    try:
+        _send_email(
+            to_email=to_email,
+            subject=subject,
+            html_body=html_body,
+        )
+        logger.info(
+            "First-touch email sent to %s for tenant=%s source=%s",
+            to_email,
+            tenant_key,
+            source,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception(
+            "Failed to send first-touch email to %s: %s",
+            to_email,
+            exc,
+        )
+        raise

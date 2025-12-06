@@ -1,29 +1,21 @@
+# backend_v2/routers/admin_ingestion.py
 import logging
 from typing import Any, Dict, Optional
 
-from fastapi import (
-    APIRouter,
-    Depends,
-    File,
-    Form,
-    Request,
-    UploadFile,
-)
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from backend_v2.db import get_db
-from backend_v2.ingestion.services import (
-    IngestionError,
-    ingest_leads_from_csv_content,
-)
+from backend_v2.ingestion.services import IngestionError, ingest_leads_from_csv_content
+from backend_v2.models.ingestion_event import IngestionEvent
 
 logger = logging.getLogger("the13th.backend_v2.routers.admin_ingestion")
 
 router = APIRouter(tags=["admin-ingestion"])
 
-# Same templates root as the rest of your admin
 templates = Jinja2Templates(directory="backend_v2/templates")
 
 
@@ -36,11 +28,6 @@ def admin_csv_ingestion_form(
     request: Request,
     tenant_key: Optional[str] = None,
 ) -> HTMLResponse:
-    """
-    Render the admin CSV upload page.
-
-    Lets an internal admin upload a CSV for a given tenant/brokerage.
-    """
     context: Dict[str, Any] = {
         "request": request,
         "tenant_key": tenant_key or "",
@@ -69,9 +56,6 @@ async def admin_csv_ingestion_submit(
     ),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
-    """
-    Handle CSV upload from the admin UI and display ingestion results.
-    """
     context: Dict[str, Any] = {
         "request": request,
         "tenant_key": tenant_key or "",
@@ -113,7 +97,7 @@ async def admin_csv_ingestion_submit(
             context,
             status_code=400,
         )
-    except Exception as exc:  # safety net
+    except Exception as exc:
         logger.exception("Unexpected error during admin CSV ingestion")
         context["error"] = f"Unexpected error during CSV ingestion: {exc}"
         return templates.TemplateResponse(
@@ -123,3 +107,45 @@ async def admin_csv_ingestion_submit(
         )
 
     return templates.TemplateResponse("admin_ingestion_csv.html", context)
+
+
+@router.get(
+    "/admin/ingestion/logs",
+    response_class=HTMLResponse,
+    summary="Ingestion activity log",
+)
+def admin_ingestion_logs(
+    request: Request,
+    db: Session = Depends(get_db),
+    tenant_key: Optional[str] = None,
+    source: Optional[str] = None,
+    channel: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 200,
+) -> HTMLResponse:
+    """View recent ingestion events for debugging and trust."""
+    limit = max(1, min(limit, 500))
+
+    query = db.query(IngestionEvent).order_by(desc(IngestionEvent.created_at))
+
+    if tenant_key:
+        query = query.filter(IngestionEvent.tenant_key == tenant_key)
+    if source:
+        query = query.filter(IngestionEvent.source == source)
+    if channel:
+        query = query.filter(IngestionEvent.channel == channel)
+    if status:
+        query = query.filter(IngestionEvent.status == status)
+
+    events = query.limit(limit).all()
+
+    context: Dict[str, Any] = {
+        "request": request,
+        "tenant_key": tenant_key or "",
+        "source": source or "",
+        "channel": channel or "",
+        "status": status or "",
+        "limit": limit,
+        "events": events,
+    }
+    return templates.TemplateResponse("admin_ingestion_logs.html", context)

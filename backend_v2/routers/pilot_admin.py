@@ -16,6 +16,8 @@ from backend_v2.config import settings
 from backend_v2.db import get_db
 from backend_v2.models.pilot import Pilot, PilotStatus, touch_pilot_for_update
 from backend_v2.email.service import send_pilot_checkout_email
+from backend_v2.ingestion.config import ingestion_settings
+from backend_v2.onboarding.generator import OnboardingGenerator
 
 logger = logging.getLogger("the13th.backend_v2.routers.pilot_admin")
 
@@ -29,6 +31,12 @@ class ApprovePilotResponse(BaseModel):
     id: int
     status: str
     checkout_url: Optional[str] = None
+
+
+class OnboardingPackResponse(BaseModel):
+    pilot_id: int
+    status: str
+    onboarding: dict[str, Any]
 
 
 @router.get("/admin/pilots/", response_class=HTMLResponse)
@@ -246,4 +254,81 @@ def approve_pilot(
         id=pilot.id,
         status=str(status_value),
         checkout_url=checkout_url,
+    )
+
+
+@router.post(
+    "/admin/pilots/{pilot_id}/onboarding-pack",
+    response_model=OnboardingPackResponse,
+    summary="Generate onboarding pack for a pilot",
+)
+def generate_onboarding_pack(
+    pilot_id: int,
+    db: Session = Depends(get_db),
+) -> OnboardingPackResponse:
+    """
+    Generate a tenant-specific onboarding pack for a pilot.
+
+    This will:
+    - Build a JSON bundle with tenant_key, webhook_url and resources
+    - Render the HTML onboarding email
+    - Optionally email the pilot contact (if email is present)
+    - Persist the JSON bundle to disk for audit/debug
+    """
+    logger.info("Admin requested onboarding pack for pilot_id=%s", pilot_id)
+
+    pilot: Optional[Pilot] = db.get(Pilot, pilot_id)
+    if pilot is None:
+        logger.warning("Pilot not found for onboarding pack: id=%s", pilot_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pilot not found",
+        )
+
+    # Ingestion API keys are required to construct a meaningful pack
+    api_keys: List[str] = getattr(ingestion_settings, "api_keys", []) or []
+    if not api_keys:
+        logger.error(
+            "Cannot generate onboarding pack: no ingestion API keys configured."
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ingestion API keys are not configured",
+        )
+
+    ingestion_key: str = api_keys[0]
+
+    # Choose a reasonable tenant_key:
+    # Prefer an explicit tenant_key if present on the model, then brokerage fields, then fallback.
+    tenant_key: str = (
+        getattr(pilot, "tenant_key", None)
+        or getattr(pilot, "brokerage_name", None)
+        or getattr(pilot, "brokerage", None)
+        or f"pilot-{pilot.id}"
+    )
+
+    # Contact email to receive onboarding instructions (optional but preferred)
+    recipient_email: Optional[str] = (
+        getattr(pilot, "contact_email", None) or getattr(pilot, "email", None)
+    )
+
+    generator = OnboardingGenerator()
+
+    onboarding_data: dict[str, Any] = generator.generate_onboarding_pack(
+        tenant_key=tenant_key,
+        ingestion_key=ingestion_key,
+        recipient_email=recipient_email,
+    )
+
+    logger.info(
+        "Onboarding pack generated for pilot_id=%s tenant_key=%s email=%s",
+        pilot.id,
+        tenant_key,
+        recipient_email,
+    )
+
+    return OnboardingPackResponse(
+        pilot_id=pilot.id,
+        status="ok",
+        onboarding=onboarding_data,
     )

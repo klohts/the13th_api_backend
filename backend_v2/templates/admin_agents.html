@@ -1,0 +1,11 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<h1 class="text-3xl text-[#FCE6C8] mb-6">Agents</h1>
+<div class="space-y-3">
+{% for a in agents %}
+<div class="bg-[#120017]/80 border border-purple-600/40 p-3 rounded-xl">
+{{ a.name }} • {{ a.email }} • Active: {{ a.is_active }}
+</div>
+{% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<h1 class="text-3xl text-[#FCE6C8] mb-6">Lead Assignment Rules</h1>
+<div class="space-y-4">
+{% for r in rules %}
+<div class="bg-[#120017]/80 border border-purple-600/40 p-4 rounded-xl">
+Tenant: {{ r.tenant_key }} • Strategy: {{ r.strategy }}
+</div>
+{% endfor %}
+</div>
+{% endblock %}

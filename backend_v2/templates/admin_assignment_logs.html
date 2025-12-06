@@ -1,0 +1,11 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<h1 class="text-3xl text-[#FCE6C8] mb-6">Assignment Logs</h1>
+<div class="space-y-3">
+{% for l in logs %}
+<div class="bg-[#120017]/80 border border-purple-600/40 p-3 rounded-xl text-slate-300">
+Lead {{ l.lead_id }} → Agent {{ l.agent_id }} | {{ l.status }} | {{ l.message }}
+</div>
+{% endfor %}
+</div>
+{% endblock %}

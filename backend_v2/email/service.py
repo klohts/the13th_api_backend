@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
@@ -10,7 +9,7 @@ from pydantic import EmailStr
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Content
 
-# Use the central email config module
+# Use the central email config (already initialised at startup)
 from backend_v2.email import config as email_config
 
 logger = logging.getLogger("the13th.backend_v2.email.service")
@@ -22,12 +21,24 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 # Settings loader
 # ---------------------------------------------------------------------------
 
-@dataclass
+
 class EmailSettingsCompat:
-    sendgrid_api_key: str
-    from_email: EmailStr
-    from_name: str
-    admin_email: Optional[EmailStr] = None
+    """
+    Thin wrapper around backend_v2.email.config.email_settings, so this
+    service does not depend on its exact implementation.
+    """
+
+    def __init__(
+        self,
+        sendgrid_api_key: str,
+        from_email: EmailStr,
+        from_name: str,
+        admin_email: Optional[EmailStr] = None,
+    ) -> None:
+        self.sendgrid_api_key = sendgrid_api_key
+        self.from_email = from_email
+        self.from_name = from_name
+        self.admin_email = admin_email
 
 
 def _get_settings() -> Optional[EmailSettingsCompat]:
@@ -73,6 +84,7 @@ def _get_settings() -> Optional[EmailSettingsCompat]:
 # Jinja environment
 # ---------------------------------------------------------------------------
 
+
 def _init_jinja() -> Optional[Environment]:
     if not TEMPLATES_DIR.exists():
         logger.error("Email templates directory does not exist: %s", TEMPLATES_DIR)
@@ -96,12 +108,11 @@ def _render_template(template_name: str, context: Mapping[str, Any]) -> str:
         logger.error(
             "Jinja environment is not initialised; templates directory missing"
         )
-        # Fallback so routes never blow up
         return f"{template_name} – plain text fallback\n\n{context}"
 
     try:
         template = JINJA_ENV.get_template(template_name)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.error(
             "Failed to load email template %s: %s",
             template_name,
@@ -112,7 +123,7 @@ def _render_template(template_name: str, context: Mapping[str, Any]) -> str:
 
     try:
         return template.render(**context)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.error(
             "Failed to render email template %s: %s",
             template_name,
@@ -126,6 +137,7 @@ def _render_template(template_name: str, context: Mapping[str, Any]) -> str:
 # Core SendGrid send
 # ---------------------------------------------------------------------------
 
+
 def _send_email(
     *,
     to_email: str,
@@ -137,8 +149,8 @@ def _send_email(
     """
     Core SendGrid send wrapper.
 
-    Never raises to the caller; failures are logged as errors so the
-    pilot flow keeps running even if email fails.
+    Never raises to the caller; failures are logged as errors so routes keep
+    returning 200 even if email is misconfigured.
     """
     settings = _get_settings()
     if settings is None:
@@ -165,7 +177,7 @@ def _send_email(
     try:
         client = SendGridAPIClient(settings.sendgrid_api_key)
         response = client.send(message)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.error(
             "Failed to send email via SendGrid to %s: %s",
             to_email,
@@ -174,14 +186,14 @@ def _send_email(
         )
         return
 
-    status = getattr(response, "status_code", None)
+    status_code = getattr(response, "status_code", None)
     body = getattr(response, "body", b"")[:1000]
 
-    if status is None or status >= 400:
+    if status_code is None or status_code >= 400:
         logger.error(
             "SendGrid responded with error for %s: status=%s body=%s",
             to_email,
-            status,
+            status_code,
             body,
         )
     else:
@@ -189,13 +201,14 @@ def _send_email(
             "Email sent successfully: to=%s subject=%s status=%s",
             to_email,
             subject,
-            status,
+            status_code,
         )
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _safe_attr(obj: Any, name: str, default: Any = "") -> Any:
     """Return attribute or dict key, tolerant of different payload types."""
@@ -209,8 +222,9 @@ def _safe_attr(obj: Any, name: str, default: Any = "") -> Any:
 
 
 # ---------------------------------------------------------------------------
-# Public email functions used by the rest of backend_v2
+# Public email functions
 # ---------------------------------------------------------------------------
+
 
 def send_pilot_confirmation(pilot_request: Any) -> None:
     """Send confirmation email to the brokerage that submitted a pilot request."""
@@ -306,16 +320,11 @@ def send_pilot_checkout_email(
     brokerage_name: Optional[str] = None,
     full_name: Optional[str] = None,
 ) -> None:
-    """
-    Send the Stripe checkout link to the brokerage once approved.
-
-    Called from pilot_admin.approve_pilot with explicit to_email / brokerage_name.
-    """
+    """Send the Stripe checkout link to the brokerage once approved."""
     if not to_email:
         logger.error(
             "send_pilot_checkout_email called without a contact email; "
-            "to_email=%r checkout_url=%r",
-            to_email,
+            "checkout_url=%r",
             checkout_url,
         )
         return
@@ -337,7 +346,9 @@ def send_pilot_checkout_email(
 
 
 def send_pilot_onboarding_email(
-    to_email: str, full_name: str, brokerage_name: str
+    to_email: str,
+    full_name: str,
+    brokerage_name: str,
 ) -> None:
     """Send onboarding email when Stripe marks the pilot as active."""
     if not to_email:
@@ -359,11 +370,12 @@ def send_pilot_onboarding_email(
     )
 
 
-def send_pilot_summary_email(pilot: Any, summary_context: Mapping[str, Any]) -> None:
+def send_pilot_summary_email(
+    pilot: Any,
+    summary_context: Mapping[str, Any],
+) -> None:
     """
     Send the 7-day pilot summary + recommendations.
-
-    Safe even if templates or settings are misconfigured.
     """
     to_email = _safe_attr(pilot, "contact_email") or _safe_attr(pilot, "email")
     full_name = _safe_attr(pilot, "contact_name") or _safe_attr(pilot, "full_name")

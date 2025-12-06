@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -25,15 +25,6 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 router = APIRouter(tags=["admin-pilots"])
 
 
-class ApprovePilotRequest(BaseModel):
-    """
-    Request model kept for future extensibility.
-    Currently the pilot_id comes from the URL path.
-    """
-
-    pilot_id: int
-
-
 class ApprovePilotResponse(BaseModel):
     id: int
     status: str
@@ -47,14 +38,9 @@ def list_pilots(
 ) -> HTMLResponse:
     """
     Render the admin pilot command center.
-
-    The template is responsible for computing / displaying the KPI tiles;
-    we just pass the ordered list of pilots.
     """
     pilots: List[Pilot] = (
-        db.execute(
-            select(Pilot).order_by(Pilot.requested_at.desc())
-        )
+        db.execute(select(Pilot).order_by(Pilot.requested_at.desc()))
         .scalars()
         .all()
     )
@@ -120,13 +106,24 @@ def approve_pilot(
 
     # Derive customer email & brokerage name with fallbacks
     customer_email: Optional[str] = (
-        getattr(pilot, "email", None) or getattr(pilot, "contact_email", None)
+        getattr(pilot, "contact_email", None)
+        or getattr(pilot, "email", None)
     )
     brokerage_name: str = (
         getattr(pilot, "brokerage_name", None)
         or getattr(pilot, "brokerage", None)
         or ""
     )
+
+    if not customer_email:
+        logger.error(
+            "Pilot %s has no contact_email/email; cannot approve & send checkout",
+            pilot.id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Pilot does not have a contact email configured.",
+        )
 
     # Build success / cancel URLs from PUBLIC_BASE_URL
     public_base = settings.public_base_url.rstrip("/")
@@ -142,7 +139,7 @@ def approve_pilot(
             customer_email,
         )
         checkout_session = stripe.checkout.Session.create(
-            mode="payment",
+            mode="subscription",  # <— IMPORTANT: subscription for recurring price
             line_items=[{"price": price_id, "quantity": 1}],
             customer_email=customer_email,
             metadata={
@@ -178,6 +175,8 @@ def approve_pilot(
             to_email=customer_email,
             checkout_url=checkout_url,
             brokerage_name=brokerage_name or None,
+            full_name=getattr(pilot, "contact_name", None)
+            or getattr(pilot, "full_name", None),
         )
     except Exception as exc:  # noqa: BLE001
         logger.exception(
@@ -192,10 +191,12 @@ def approve_pilot(
         pilot.status,
     )
 
+    status_value: Any = (
+        pilot.status.value if hasattr(pilot.status, "value") else pilot.status
+    )
+
     return ApprovePilotResponse(
         id=pilot.id,
-        status=str(
-            pilot.status.value if hasattr(pilot.status, "value") else pilot.status
-        ),
+        status=str(status_value),
         checkout_url=checkout_url,
     )

@@ -1,0 +1,107 @@
+{% extends "admin_base.html" %}
+
+{% block title %}CSV Lead Ingestion · THE13TH Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    <div class="bg-white/5 border border-white/10 rounded-2xl p-6 shadow-lg backdrop-blur">
+        <h1 class="text-2xl font-semibold mb-2">
+            CSV Lead Ingestion
+        </h1>
+        <p class="text-sm text-gray-300">
+            Upload a CSV file of leads for a specific brokerage (tenant). THE13TH will normalize and ingest them into the
+            unified <span class="font-semibold">Leads</span> table and trigger downstream automation.
+        </p>
+    </div>
+
+    {% if error %}
+        <div class="bg-red-500/10 border border-red-500/40 text-red-200 rounded-xl px-4 py-3 text-sm">
+            {{ error }}
+        </div>
+    {% endif %}
+
+    {% if result %}
+        <div class="bg-emerald-500/10 border border-emerald-500/40 text-emerald-100 rounded-xl px-4 py-3 text-sm space-y-1">
+            <div class="font-semibold">Ingestion complete</div>
+            <div>File: <span class="font-mono text-xs">{{ result.filename }}</span></div>
+            <div>Tenant: <span class="font-mono text-xs">{{ result.tenant_key or "—" }}</span></div>
+            <div>Source label: <span class="font-mono text-xs">{{ result.source }}</span></div>
+            <div class="mt-2 flex flex-wrap gap-4 text-xs">
+                <span>Total rows: <span class="font-semibold">{{ result.total_rows }}</span></span>
+                <span>Ingested: <span class="font-semibold">{{ result.ingested_rows }}</span></span>
+                <span>Skipped: <span class="font-semibold">{{ result.skipped_rows }}</span></span>
+            </div>
+            <div class="mt-2 text-xs">
+                View ingested leads in
+                <a href="/admin/leads{% if result.tenant_key %}?tenant_key={{ result.tenant_key }}{% endif %}"
+                   class="underline decoration-emerald-400 hover:decoration-emerald-300">
+                    Admin → Leads
+                </a>.
+            </div>
+        </div>
+    {% endif %}
+
+    <form
+        method="post"
+        enctype="multipart/form-data"
+        class="bg-white/5 border border-white/10 rounded-2xl p-6 shadow-lg backdrop-blur space-y-4"
+    >
+        <div>
+            <label class="block text-sm font-medium mb-1">
+                Tenant key (brokerage identifier)
+            </label>
+            <input
+                type="text"
+                name="tenant_key"
+                value="{{ tenant_key }}"
+                placeholder="e.g. northstar-realty"
+                class="w-full rounded-xl bg-black/30 border border-white/15 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500/70 focus:border-transparent"
+            />
+            <p class="mt-1 text-xs text-gray-400">
+                This key ties all ingested rows to a specific brokerage in THE13TH.
+            </p>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">
+                Source label
+            </label>
+            <input
+                type="text"
+                name="default_source"
+                value="{{ default_source }}"
+                class="w-full rounded-xl bg-black/30 border border-white/15 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500/70 focus:border-transparent"
+            />
+            <p class="mt-1 text-xs text-gray-400">
+                Used to tag all ingested leads (e.g. <span class="font-mono">zillow_csv</span>, <span class="font-mono">legacy_crm</span>).
+            </p>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">
+                CSV file
+            </label>
+            <input
+                type="file"
+                name="file"
+                accept=".csv"
+                required
+                class="w-full text-sm text-gray-200 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-fuchsia-600/80 file:text-white hover:file:bg-fuchsia-500/90"
+            />
+            <p class="mt-1 text-xs text-gray-400">
+                Typical headers: <span class="font-mono">full_name,email,phone</span>. THE13TH also understands variants like
+                <span class="font-mono">first_name,last_name</span>.
+            </p>
+        </div>
+
+        <div class="pt-2 flex justify-end">
+            <button
+                type="submit"
+                class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium bg-gradient-to-r from-purple-600 via-fuchsia-500 to-rose-500 text-white shadow-lg shadow-fuchsia-500/30 hover:shadow-fuchsia-400/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-black focus:ring-fuchsia-500/80"
+            >
+                Ingest CSV
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

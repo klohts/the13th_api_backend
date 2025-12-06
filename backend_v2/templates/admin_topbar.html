@@ -1,0 +1,26 @@
+{# backend_v2/templates/admin_topbar.html #}
+<header class="w-full border-b border-white/10 bg-black/40 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <a href="/admin/dashboard" class="flex items-center gap-2">
+                <img
+                    src="https://the13thhq.com/email/the13th_logo.png"
+                    alt="THE13TH"
+                    class="h-6 w-auto"
+                    loading="lazy"
+                />
+                <span
+                    class="inline-flex items-center rounded-full border border-white/20 bg-white/5 px-2 py-0.5 text-[11px] font-medium tracking-wide text-gray-100"
+                >
+                    Admin
+                </span>
+            </a>
+        </div>
+        <nav class="flex items-center gap-3 text-xs text-gray-300">
+            <a href="/admin/dashboard" class="hover:text-white">Overview</a>
+            <a href="/admin/leads" class="hover:text-white">Leads</a>
+            <a href="/admin/ingestion/csv" class="hover:text-white">CSV Ingestion</a>
+            <!-- Add more admin links as needed -->
+        </nav>
+    </div>
+</header>

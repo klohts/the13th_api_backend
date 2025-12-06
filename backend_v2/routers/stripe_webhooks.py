@@ -11,6 +11,7 @@ from sqlmodel import Session
 from backend_v2.config import settings
 from backend_v2.db import get_db
 from backend_v2.models.pilot import Pilot, PilotStatus, touch_pilot_for_update
+from backend_v2.email.service import send_pilot_onboarding_email
 
 logger = logging.getLogger("the13th.backend_v2.routers.stripe_webhooks")
 
@@ -146,3 +147,25 @@ async def _handle_checkout_session_completed(
     # send_pilot_activated_email(pilot)
     #
     logger.info("Pilot id=%s activated successfully via Stripe webhook", pilot.id)
+
+    # After pilot has been set ACTIVE and the session committed:
+    try:
+        if pilot.contact_email:
+            full_name = pilot.contact_name or pilot.contact_email
+            send_pilot_onboarding_email(
+                to_email=pilot.contact_email,
+                full_name=full_name,
+                brokerage_name=pilot.brokerage_name or "",
+            )
+        else:
+            # Fallback if only a generic email field exists
+            if getattr(pilot, "email", None):
+                full_name = pilot.contact_name or pilot.email
+                send_pilot_onboarding_email(
+                    to_email=pilot.email,
+                    full_name=full_name,
+                    brokerage_name=pilot.brokerage_name or "",
+                )
+    except Exception as exc:  # noqa: BLE001
+        # Do not block the webhook on email failures
+        logger.exception("Failed to send onboarding email for pilot_id=%s: %s", pilot.id, exc)

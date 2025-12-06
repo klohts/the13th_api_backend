@@ -1,3 +1,4 @@
+# backend_v2/email/service.py
 from __future__ import annotations
 
 import logging
@@ -6,35 +7,31 @@ from typing import Any, Dict
 from pydantic import EmailStr
 
 from backend_v2.schemas.pilot import PilotRequest
-from backend_v2.models.pilot import Pilot
+from backend_v2.config import settings
 from .client import email_client
 
 logger = logging.getLogger(__name__)
 
+# === Pilot request confirmation (already live) ===
+
 PILOT_TEMPLATE_NAME = "pilot_confirmation.html"
 PILOT_SUBJECT = "Your 7-Day Revenue Intelligence Pilot with THE13TH"
-
-CHECKOUT_TEMPLATE_NAME = "pilot_checkout.html"
-CHECKOUT_SUBJECT = "Confirm your THE13TH Revenue Intelligence Pilot"
 
 
 def build_pilot_context(pilot: PilotRequest) -> Dict[str, Any]:
     """Map PilotRequest into template context."""
-    full_name = getattr(pilot, "full_name", "").strip() or ""
-    first_name = getattr(pilot, "first_name", "") or full_name.split(" ")[0] if full_name else ""
-    last_name = getattr(pilot, "last_name", "") or " ".join(full_name.split(" ")[1:]) if full_name else ""
-
+    full_name = f"{pilot.first_name} {pilot.last_name}".strip()
     return {
         "full_name": full_name,
-        "first_name": first_name,
-        "last_name": last_name,
+        "first_name": pilot.first_name,
+        "last_name": pilot.last_name,
         "brokerage_name": pilot.brokerage_name,
-        "website": getattr(pilot, "website", "") or "",
-        "agents_on_team": getattr(pilot, "agents_on_team", None) or "Not specified",
-        "monthly_online_leads": getattr(pilot, "monthly_online_leads", None) or "Not specified",
-        "primary_focus": getattr(pilot, "primary_focus", None) or "Not specified",
-        "main_problem": getattr(pilot, "main_problem", None) or "",
-        "anything_special": getattr(pilot, "anything_special", None) or "",
+        "website": pilot.website or "",
+        "agents_on_team": pilot.agents_on_team or "Not specified",
+        "monthly_online_leads": pilot.monthly_online_leads or "Not specified",
+        "primary_focus": pilot.primary_focus or "Not specified",
+        "main_problem": pilot.main_problem or "",
+        "anything_special": pilot.anything_special or "",
     }
 
 
@@ -48,7 +45,7 @@ def send_pilot_confirmation(pilot: PilotRequest) -> None:
     context = build_pilot_context(pilot)
 
     plain_text_fallback = (
-        f"Hi {context['first_name'] or 'there'},\n\n"
+        f"Hi {pilot.first_name},\n\n"
         "Thanks for requesting a 7-day Revenue Intelligence Pilot with THE13TH. "
         "We’ll review your details and email next steps shortly.\n\n"
         "– THE13TH Pilot Desk"
@@ -65,47 +62,75 @@ def send_pilot_confirmation(pilot: PilotRequest) -> None:
     )
 
 
-# ---------- NEW: Stripe checkout email ----------
+# === Post-payment onboarding automation (new) ===
+
+PILOT_ONBOARDING_TEMPLATE_NAME = "pilot_onboarding.html"
+PILOT_ONBOARDING_SUBJECT = "Welcome — Your THE13TH Revenue Intelligence Pilot Is Live"
 
 
-def build_pilot_checkout_context(pilot: Pilot, checkout_url: str) -> Dict[str, Any]:
-    """Template context for the Stripe checkout email."""
-    full_name = pilot.contact_name or ""
+def build_pilot_onboarding_context(
+    *,
+    full_name: str,
+    brokerage_name: str,
+) -> Dict[str, Any]:
+    """
+    Build context for the post-payment onboarding email.
+
+    This is intentionally lightweight and only depends on primitives so it can
+    be called from webhooks, admin tools, or background jobs.
+    """
+    full_name_clean = (full_name or "").strip()
+    first_name = full_name_clean.split(" ", 1)[0] if full_name_clean else "there"
+
     return {
-        "full_name": full_name,
-        "brokerage_name": pilot.brokerage_name,
-        "checkout_url": checkout_url,
+        "full_name": full_name_clean or first_name,
+        "first_name": first_name,
+        "brokerage_name": brokerage_name or "your brokerage",
+        "support_email": str(settings.email_from_address),
     }
 
 
-def send_pilot_checkout_email(pilot: Pilot, checkout_url: str) -> None:
+def send_pilot_onboarding_email(
+    *,
+    to_email: EmailStr,
+    full_name: str,
+    brokerage_name: str,
+) -> None:
     """
-    Email the Stripe checkout link for the pilot setup fee.
+    Send the first onboarding email after a pilot is activated (Stripe payment
+    succeeded and the pilot status has been flipped to ACTIVE).
 
-    This is triggered from the Admin → Approve & Send Checkout flow.
+    This should be called exactly once per successful pilot activation.
     """
-    to_email: EmailStr = pilot.contact_email  # type: ignore[assignment]
-    context = build_pilot_checkout_context(pilot, checkout_url)
+    context = build_pilot_onboarding_context(
+        full_name=full_name,
+        brokerage_name=brokerage_name,
+    )
 
     plain_text_fallback = (
-        f"Hi {context['full_name'] or 'there'},\n\n"
-        "Here is your secure checkout link to start your 7-day Revenue Intelligence Pilot "
-        "with THE13TH:\n\n"
-        f"{checkout_url}\n\n"
-        "If you weren’t expecting this email, you can safely ignore it.\n\n"
+        f"Hi {context['first_name']},\n\n"
+        "Your 7-day Revenue Intelligence Pilot with THE13TH is now active.\n\n"
+        "Over the next 24 hours we’ll:\n"
+        "• Connect THE13TH to one lead inbox + one lead source\n"
+        "• Turn on intelligent first-touch and follow-up email support\n"
+        "• Start watching lead flow and agent response speed in your pilot dashboard\n\n"
+        f"If you’d like to get a head start, reply to this email with:\n"
+        "• The inbox you’d like us to connect\n"
+        "• Your primary lead source for the pilot week\n\n"
+        f"If you have any questions, you can always reach us at {context['support_email']}.\n\n"
         "– THE13TH Pilot Desk"
     )
 
     logger.info(
-        "Sending pilot checkout email to %s for pilot_id=%s",
+        "Sending pilot onboarding email to %s for brokerage=%s",
         to_email,
-        getattr(pilot, "id", None),
+        brokerage_name,
     )
 
     email_client.send_html_email(
         to_email=to_email,
-        subject=CHECKOUT_SUBJECT,
-        template_name=CHECKOUT_TEMPLATE_NAME,
+        subject=PILOT_ONBOARDING_SUBJECT,
+        template_name=PILOT_ONBOARDING_TEMPLATE_NAME,
         context=context,
         plain_text_fallback=plain_text_fallback,
     )

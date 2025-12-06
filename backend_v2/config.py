@@ -87,6 +87,9 @@ class Settings(BaseSettings):
     # Env: STRIPE_PRICE_ID_PILOT_SETUP
     stripe_price_id_pilot_setup: Optional[str] = None
 
+    # Env: STRIPE_PILOT_PRICE_ID
+    stripe_pilot_price_id: str
+
     # --------------------------------------------------
     # Admin auth (for /admin routes etc.)
     # --------------------------------------------------

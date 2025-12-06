@@ -1,8 +1,7 @@
-# backend_v2/email/service.py
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from pydantic import EmailStr
 
@@ -131,6 +130,74 @@ def send_pilot_onboarding_email(
         to_email=to_email,
         subject=PILOT_ONBOARDING_SUBJECT,
         template_name=PILOT_ONBOARDING_TEMPLATE_NAME,
+        context=context,
+        plain_text_fallback=plain_text_fallback,
+    )
+
+
+# === Pilot checkout email (admin approval → Stripe payment link) ===
+
+PILOT_CHECKOUT_TEMPLATE_NAME = "pilot_checkout.html"
+PILOT_CHECKOUT_SUBJECT = "THE13TH Pilot Approved — Complete Your Setup"
+
+
+def build_pilot_checkout_context(
+    *,
+    brokerage_name: Optional[str],
+    checkout_url: str,
+) -> Dict[str, Any]:
+    """
+    Build context for the checkout email sent after admin approval.
+
+    Keeps dependencies minimal so this can be called from routers, admin tools,
+    or background jobs without needing a full PilotRequest object.
+    """
+    return {
+        "brokerage_name": brokerage_name or "your brokerage",
+        "checkout_url": checkout_url,
+        "support_email": str(settings.email_from_address),
+    }
+
+
+def send_pilot_checkout_email(
+    to_email: EmailStr,
+    checkout_url: str,
+    brokerage_name: Optional[str] = None,
+) -> None:
+    """
+    Send Stripe checkout link to the broker after an admin approves their pilot.
+
+    Signature is positional-friendly for existing calls in routers:
+        send_pilot_checkout_email(pilot.work_email, checkout_url, pilot.brokerage_name)
+    """
+    if not checkout_url:
+        raise ValueError("checkout_url is required")
+
+    context = build_pilot_checkout_context(
+        brokerage_name=brokerage_name,
+        checkout_url=checkout_url,
+    )
+
+    plain_text_fallback = (
+        f"Hi there,\n\n"
+        "Your 7-day Revenue Intelligence Pilot with THE13TH has been approved.\n\n"
+        "To activate your pilot, please complete your setup using this secure link:\n"
+        f"{checkout_url}\n\n"
+        f"If you have any questions, you can reply to this email or reach us at "
+        f"{context['support_email']}.\n\n"
+        "– THE13TH Pilot Desk"
+    )
+
+    logger.info(
+        "Sending pilot checkout email to %s for brokerage=%s",
+        to_email,
+        brokerage_name or "N/A",
+    )
+
+    email_client.send_html_email(
+        to_email=to_email,
+        subject=PILOT_CHECKOUT_SUBJECT,
+        template_name=PILOT_CHECKOUT_TEMPLATE_NAME,
         context=context,
         plain_text_fallback=plain_text_fallback,
     )

@@ -5,7 +5,6 @@
     <title>{% block title %}THE13TH Admin{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Tailwind CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -33,7 +32,6 @@
 
     <style>
       body {
-        /* Same background treatment as landing page */
         background: radial-gradient(circle at top left, #4b0082, #0a0014 60%);
       }
     </style>
@@ -42,34 +40,39 @@
 <body class="min-h-screen text-slate-100 antialiased font-sans text-body">
 <div class="flex min-h-screen">
 
-    <!-- SIDEBAR -->
-    <aside class="hidden lg:flex lg:flex-col w-72 bg-gradient-to-b from-white/10 via-white/5 to-white/0 border-r border-white/10 backdrop-blur-2xl shadow-glass-strong">
+    <!-- 🟣 DARK CONSOLE SIDEBAR -->
+    <aside class="hidden lg:flex lg:flex-col w-72
+        bg-gradient-to-b from-[#1a002e] via-[#12001f] to-[#06000c]
+        border-r border-purple-900/50
+        shadow-2xl">
+
         <!-- BRAND -->
-        <div class="flex items-center justify-between px-6 py-6 border-b border-white/10">
-            <!-- EXACT same logo treatment as landing header -->
+        <div class="flex items-center px-6 py-6 border-b border-purple-900/40">
             <a href="/"
                class="text-2xl sm:text-3xl font-extrabold tracking-tight leading-none">
-                <span class="text-purple-900">THE</span><span class="text-gray-50">13TH</span>
+                <span class="text-purple-300">THE</span>
+                <span class="text-white">13TH</span>
             </a>
         </div>
 
         <!-- NAV -->
         <nav class="flex-1 overflow-y-auto py-5 text-[0.9rem] space-y-5">
+
             <!-- COMMAND -->
             <div>
-                <div class="px-6 mb-1 text-[0.68rem] uppercase tracking-[0.3em] text-purple-200/80">
+                <div class="px-6 mb-1 text-[0.68rem] uppercase tracking-[0.3em] text-purple-300/70">
                     Command
                 </div>
                 <a href="/admin"
                    class="flex items-center gap-3 px-6 py-2.5 rounded-2xl mx-3
-                          transition hover:bg-white/15 hover:text-slate-50
-                          {% if active_nav == 'overview' %}bg-white/15 text-slate-50{% else %}text-slate-300{% endif %}">
+                          transition hover:bg-purple-800/40
+                          {% if active_nav == 'overview' %}bg-purple-800/50 text-white{% else %}text-purple-200{% endif %}">
                     <div class="h-7 w-7 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-500 flex items-center justify-center text-[0.8rem] font-semibold">
                         ◦
                     </div>
                     <div class="flex flex-col">
                         <span class="font-medium">Overview</span>
-                        <span class="text-[0.65rem] text-purple-100/80">
+                        <span class="text-[0.65rem] text-purple-300/70">
                             Live health & key metrics
                         </span>
                     </div>
@@ -78,193 +81,87 @@
 
             <!-- OPERATIONS -->
             <div>
-                <div class="px-6 mb-1 text-[0.68rem] uppercase tracking-[0.3em] text-purple-200/80">
+                <div class="px-6 mb-1 text-[0.68rem] uppercase tracking-[0.3em] text-purple-300/70">
                     Operations
                 </div>
 
-                <!-- Leads -->
-                <a href="/admin/leads"
+                {% set links = [
+                    ('/admin/leads','leads','Leads'),
+                    ('/admin/pilots','pilots','Pilots'),
+                    ('/admin/billing','billing','Billing'),
+                    ('/admin/tenants','tenants','Brokerages')
+                ] %}
+                {% for url,key,label in links %}
+                <a href="{{ url }}"
                    class="flex items-center justify-between gap-2 px-6 py-2.5 rounded-2xl mx-3
-                          transition hover:bg-white/10 hover:text-slate-50
-                          {% if active_nav == 'leads' %}bg-white/10 text-slate-50{% else %}text-slate-300{% endif %}">
+                          transition hover:bg-purple-800/40
+                          {% if active_nav == key %}bg-purple-800/50 text-white{% else %}text-purple-200{% endif %}">
                     <div class="flex items-center gap-2">
                         <span class="h-1.5 w-1.5 rounded-full bg-the13accent"></span>
-                        <span class="font-medium">Leads</span>
+                        <span class="font-medium">{{ label }}</span>
                     </div>
-                    {% if sidebar_counts and sidebar_counts.leads is not none %}
-                    <span class="inline-flex items-center justify-center min-w-[1.8rem] px-2 rounded-full bg-white/15 text-[0.7rem] text-purple-100">
-                        {{ sidebar_counts.leads }}
+                    {% if sidebar_counts and sidebar_counts[key] is not none %}
+                    <span class="min-w-[1.8rem] px-2 rounded-full bg-purple-900/70 text-[0.7rem] text-purple-200 text-center">
+                        {{ sidebar_counts[key] }}
                     </span>
                     {% endif %}
                 </a>
-
-                <!-- Pilots -->
-                <a href="/admin/pilots"
-                   class="flex items-center justify-between gap-2 px-6 py-2.5 rounded-2xl mx-3
-                          transition hover:bg-white/10 hover:text-slate-50
-                          {% if active_nav == 'pilots' %}bg-white/10 text-slate-50{% else %}text-slate-300{% endif %}">
-                    <div class="flex items-center gap-2">
-                        <span class="h-1.5 w-1.5 rounded-full bg-the13accent"></span>
-                        <span class="font-medium">Pilots</span>
-                    </div>
-                    {% if sidebar_counts and sidebar_counts.pilots is not none %}
-                    <span class="inline-flex items-center justify-center min-w-[1.8rem] px-2 rounded-full bg-white/15 text-[0.7rem] text-purple-100">
-                        {{ sidebar_counts.pilots }}
-                    </span>
-                    {% endif %}
-                </a>
-
-                <!-- Billing -->
-                <a href="/admin/billing"
-                   class="flex items-center justify-between gap-2 px-6 py-2.5 rounded-2xl mx-3
-                          transition hover:bg-white/10 hover:text-slate-50
-                          {% if active_nav == 'billing' %}bg-white/10 text-slate-50{% else %}text-slate-300{% endif %}">
-                    <div class="flex items-center gap-2">
-                        <span class="h-1.5 w-1.5 rounded-full bg-the13accent"></span>
-                        <span class="font-medium">Billing</span>
-                    </div>
-                </a>
-
-                <!-- Brokerages -->
-                <a href="/admin/tenants"
-                   class="flex items-center justify-between gap-2 px-6 py-2.5 rounded-2xl mx-3
-                          transition hover:bg-white/10 hover:text-slate-50
-                          {% if active_nav == 'tenants' %}bg-white/10 text-slate-50{% else %}text-slate-300{% endif %}">
-                    <div class="flex items-center gap-2">
-                        <span class="h-1.5 w-1.5 rounded-full bg-the13accent"></span>
-                        <span class="font-medium">Brokerages</span>
-                    </div>
-                </a>
+                {% endfor %}
             </div>
 
             <!-- AUTOMATION -->
             <div>
-                <div class="px-6 mb-1 text-[0.68rem] uppercase tracking-[0.3em] text-purple-200/80">
+                <div class="px-6 mb-1 text-[0.68rem] uppercase tracking-[0.3em] text-purple-300/70">
                     Automation
                 </div>
 
-                <a href="/admin/ingestion"
-                   class="flex items-center justify-between gap-2 px-6 py-2.5 rounded-2xl mx-3
-                          transition hover:bg-white/10 hover:text-slate-50
-                          {% if active_nav == 'ingestion' %}bg-white/10 text-slate-50{% else %}text-slate-300{% endif %}">
-                    <div class="flex items-center gap-2">
-                        <span class="h-1.5 w-1.5 rounded-full bg-the13accent"></span>
-                        <span class="font-medium">Ingestion</span>
-                    </div>
+                {% set links = [
+                    ('/admin/ingestion','ingestion','Ingestion'),
+                    ('/admin/automation','automation','Email Automation')
+                ] %}
+                {% for url,key,label in links %}
+                <a href="{{ url }}"
+                   class="flex items-center gap-2 px-6 py-2.5 rounded-2xl mx-3
+                          transition hover:bg-purple-800/40
+                          {% if active_nav == key %}bg-purple-800/50 text-white{% else %}text-purple-200{% endif %}">
+                    <span class="h-1.5 w-1.5 rounded-full bg-the13accent"></span>
+                    <span class="font-medium">{{ label }}</span>
                 </a>
-
-                <a href="/admin/automation"
-                   class="flex items-center justify-between gap-2 px-6 py-2.5 rounded-2xl mx-3
-                          transition hover:bg-white/10 hover:text-slate-50
-                          {% if active_nav == 'automation' %}bg-white/10 text-slate-50{% else %}text-slate-300{% endif %}">
-                    <div class="flex items-center gap-2">
-                        <span class="h-1.5 w-1.5 rounded-full bg-the13accent"></span>
-                        <span class="font-medium">Email Automation</span>
-                    </div>
-                </a>
+                {% endfor %}
             </div>
 
             <!-- SYSTEM -->
             <div>
-                <div class="px-6 mb-1 text-[0.68rem] uppercase tracking-[0.3em] text-purple-200/80">
+                <div class="px-6 mb-1 text-[0.68rem] uppercase tracking-[0.3em] text-purple-300/70">
                     System
                 </div>
 
-                <a href="/admin/system"
-                   class="flex items-center justify-between gap-2 px-6 py-2.5 rounded-2xl mx-3
-                          transition hover:bg-white/10 hover:text-slate-50
-                          {% if active_nav == 'system' %}bg-white/10 text-slate-50{% else %}text-slate-300{% endif %}">
-                    <div class="flex items-center gap-2">
-                        <span class="h-1.5 w-1.5 rounded-full bg-the13accent"></span>
-                        <span class="font-medium">System Health</span>
-                    </div>
+                {% set links = [
+                    ('/admin/system','system','System Health'),
+                    ('/admin/audit-log','audit','Audit Log'),
+                    ('/admin/settings','settings','Settings')
+                ] %}
+                {% for url,key,label in links %}
+                <a href="{{ url }}"
+                   class="flex items-center gap-2 px-6 py-2.5 rounded-2xl mx-3
+                          transition hover:bg-purple-800/40
+                          {% if active_nav == key %}bg-purple-800/50 text-white{% else %}text-purple-200{% endif %}">
+                    <span class="h-1.5 w-1.5 rounded-full bg-the13accent"></span>
+                    <span class="font-medium">{{ label }}</span>
                 </a>
-
-                <a href="/admin/audit-log"
-                   class="flex items-center justify-between gap-2 px-6 py-2.5 rounded-2xl mx-3
-                          transition hover:bg-white/10 hover:text-slate-50
-                          {% if active_nav == 'audit' %}bg-white/10 text-slate-50{% else %}text-slate-300{% endif %}">
-                    <div class="flex items-center gap-2">
-                        <span class="h-1.5 w-1.5 rounded-full bg-the13accent"></span>
-                        <span class="font-medium">Audit Log</span>
-                    </div>
-                </a>
-
-                <a href="/admin/settings"
-                   class="flex items-center justify-between gap-2 px-6 py-2.5 rounded-2xl mx-3
-                          transition hover:bg-white/10 hover:text-slate-50
-                          {% if active_nav == 'settings' %}bg-white/10 text-slate-50{% else %}text-slate-300{% endif %}">
-                    <div class="flex items-center gap-2">
-                        <span class="h-1.5 w-1.5 rounded-full bg-the13accent"></span>
-                        <span class="font-medium">Settings</span>
-                    </div>
-                </a>
+                {% endfor %}
             </div>
+
         </nav>
 
-        <div class="px-6 py-4 border-t border-white/10 text-[0.7rem] text-purple-200/70">
+        <div class="px-6 py-4 border-t border-purple-900/50 text-[0.7rem] text-purple-300/60">
             THE13TH · Internal Admin
         </div>
     </aside>
 
     <!-- MAIN -->
     <div class="flex-1 flex flex-col">
-        <!-- TOP BAR -->
-        <header class="h-16 px-4 lg:px-8 flex items-center justify-between border-b border-white/10 bg-black/30 backdrop-blur-xl shadow-glass-strong">
-            <div class="flex items-center gap-3">
-                <!-- Mobile menu icon (not wired yet) -->
-                <button class="lg:hidden inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/15 bg-white/10">
-                    <span class="sr-only">Open menu</span>
-                    <div class="space-y-1.5">
-                        <span class="block h-[2px] w-5 bg-slate-100"></span>
-                        <span class="block h-[2px] w-5 bg-slate-100"></span>
-                        <span class="block h-[2px] w-5 bg-slate-100"></span>
-                    </div>
-                </button>
-                <div>
-                    <div class="text-[0.7rem] uppercase tracking-[0.3em] text-purple-200/80">
-                        {% block breadcrumb_prefix %}Admin{% endblock %}
-                    </div>
-                    <div class="text-[0.98rem] font-semibold text-slate-50">
-                        {% block breadcrumb_title %}{% endblock %}
-                    </div>
-                </div>
-            </div>
-
-            <div class="flex items-center gap-4">
-                {% if current_tenant %}
-                <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20">
-                    <div class="h-7 w-7 rounded-full bg-gradient-to-br from-purple-500 to-fuchsia-500 flex items-center justify-center text-[0.7rem] font-semibold uppercase">
-                        {{ current_tenant.name[:2] }}
-                    </div>
-                    <div class="flex flex-col">
-                        <span class="text-[0.8rem] font-medium text-slate-50 truncate max-w-[10rem]">
-                            {{ current_tenant.name }}
-                        </span>
-                        <span class="text-[0.65rem] uppercase tracking-[0.2em] text-purple-200/80">
-                            Tenant
-                        </span>
-                    </div>
-                </div>
-                {% endif %}
-
-                <div class="flex items-center gap-2">
-                    <div class="flex flex-col items-end leading-tight">
-                        <span class="text-[0.78rem] text-slate-200">
-                            {{ current_user_email or 'admin@the13thhq.com' }}
-                        </span>
-                        <span class="text-[0.65rem] text-slate-400">
-                            Internal Admin
-                        </span>
-                    </div>
-                    <div class="h-9 w-9 rounded-full bg-white/15 border border-white/30 flex items-center justify-center text-[0.8rem] font-semibold text-purple-100">
-                        A
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <!-- CONTENT -->
+        {% include 'admin_topbar.html' %}
         <main class="flex-1 px-4 lg:px-8 py-6 lg:py-8">
             {% block content %}{% endblock %}
         </main>

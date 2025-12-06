@@ -1,98 +1,134 @@
-# backend_v2/config.py
-
 from __future__ import annotations
 
 import logging
 from functools import lru_cache
+from typing import Optional
 
-from pydantic import ValidationError, Field, EmailStr
+from pydantic import AnyHttpUrl, EmailStr, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
-    """Central application configuration for THE13TH Backend v2."""
+    """
+    Central configuration for THE13TH backend.
 
-    # General
-    app_name: str = "THE13TH Backend v2"
-    environment: str = "local"  # local | staging | production
-    debug: bool = True
-
-    # CORS
-    # Note: Pydantic will parse comma-separated string or JSON array from env if provided.
-    allowed_origins: list[str] = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-    ]
-    allowed_methods: list[str] = ["*"]
-    allowed_headers: list[str] = ["*"]
-    allow_credentials: bool = True
-
-    # Security / JWT
-    # from .env: jwt_secret_key=...
-    jwt_secret_key: str
-    jwt_algorithm: str = "HS256"
-    access_token_expires_minutes: int = 60 * 24  # 1 day
-    refresh_token_expires_days: int = 30
-
-    # Stripe
-    # from .env: stripe_api_key=...
-    stripe_api_key: str
-    # from .env: stripe_webhook_secret=...
-    stripe_webhook_secret: str
-    stripe_pilot_price_id: str | None = None
-
-    # Core DB
-    # from .env: the13th_db_url=sqlite:///./data/the13th_allinone.db
-    the13th_db_url: str
-
-    # Lead intake service
-    # from .env: lead_intake_api_key=...
-    lead_intake_api_key: str
-    # from .env: lead_intake_api_url=http://127.0.0.1:7000
-    lead_intake_api_url: str
-
-    # Email / SendGrid
-    # from .env: SENDGRID_API_KEY=...
-    sendgrid_api_key: str
-    # from .env: EMAIL_FROM_ADDRESS=pilot@the13thhq.com
-    email_from_address: EmailStr
-    # from .env: EMAIL_FROM_NAME=THE13TH Pilot Desk
-    email_from_name: str = "THE13TH Pilot Desk"
+    - Reads from .env (local) and process environment (Render, etc.).
+    - Accepts the existing env var names you already use.
+    - Ignores extra env vars so adding new ones doesn’t break startup.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="forbid",        # strict: all env keys must be declared as fields
-        case_sensitive=False,  # so SENDGRID_API_KEY matches sendgrid_api_key
+        case_sensitive=False,
+        extra="ignore",
     )
+
+    # -------------------------------------------------------------------------
+    # Core app
+    # -------------------------------------------------------------------------
+    app_name: str = Field(default="THE13TH Backend v2", alias="APP_NAME")
+    debug: bool = Field(default=False, alias="DEBUG")
+    environment: str = Field(default="local", alias="ENVIRONMENT")
+
+    jwt_secret_key: str = Field(..., alias="JWT_SECRET_KEY")
+
+    # -------------------------------------------------------------------------
+    # Database
+    # -------------------------------------------------------------------------
+    # Uses existing DATABASE_URL env var, exposed as the13th_db_url.
+    the13th_db_url: str = Field(..., alias="DATABASE_URL")
 
     @property
     def database_url(self) -> str:
-        """Alias for primary DB URL so the rest of the app can use settings.database_url."""
+        """Backward-compatible alias used by older modules (e.g. db.py)."""
         return self.the13th_db_url
+
+    # -------------------------------------------------------------------------
+    # Public URLs
+    # -------------------------------------------------------------------------
+    public_base_url: AnyHttpUrl = Field(..., alias="PUBLIC_BASE_URL")
+
+    # -------------------------------------------------------------------------
+    # Email (SMTP) + optional SendGrid
+    # -------------------------------------------------------------------------
+    email_from_address: EmailStr = Field(..., alias="EMAIL_FROM")
+
+    email_smtp_host: str = Field(default="smtp.gmail.com", alias="EMAIL_SMTP_HOST")
+    email_smtp_port: int = Field(default=587, alias="EMAIL_SMTP_PORT")
+    email_smtp_username: str = Field(..., alias="EMAIL_SMTP_USERNAME")
+    email_smtp_password: str = Field(..., alias="EMAIL_SMTP_PASSWORD")
+    email_use_tls: bool = Field(default=True, alias="EMAIL_USE_TLS")
+
+    sendgrid_api_key: Optional[str] = Field(default=None, alias="SENDGRID_API_KEY")
+
+    # -------------------------------------------------------------------------
+    # Admin dashboard
+    # -------------------------------------------------------------------------
+    admin_dashboard_secret: str = Field(..., alias="ADMIN_DASHBOARD_SECRET")
+
+    # -------------------------------------------------------------------------
+    # Stripe (pilot payments)
+    # -------------------------------------------------------------------------
+    stripe_api_key: str = Field(..., alias="STRIPE_API_KEY")
+    stripe_webhook_secret: str = Field(..., alias="STRIPE_WEBHOOK_SECRET")
+    stripe_pilot_price_id: str = Field(..., alias="STRIPE_PILOT_PRICE_ID")
+
+    # -------------------------------------------------------------------------
+    # Lead intake + ingestion
+    # -------------------------------------------------------------------------
+    # Optional lead intake service wiring (can be empty for now).
+    lead_intake_api_key: Optional[str] = Field(
+        default=None,
+        alias="LEAD_INTAKE_API_KEY",
+    )
+    lead_intake_api_url: Optional[AnyHttpUrl] = Field(
+        default=None,
+        alias="LEAD_INTAKE_API_URL",
+    )
+
+    # Ingestion service:
+    #   INGESTION_API_KEYS=key1,key2
+    #   INGESTION_MAX_CSV_SIZE_MB=5
+    ingestion_api_keys_raw: Optional[str] = Field(
+        default=None,
+        alias="INGESTION_API_KEYS",
+    )
+    ingestion_max_csv_size_mb: int = Field(
+        default=5,
+        alias="INGESTION_MAX_CSV_SIZE_MB",
+    )
+
+    @property
+    def ingestion_api_keys(self) -> list[str]:
+        """
+        Returns a list of API keys from the comma-separated env string.
+        Safe if env is missing or empty.
+        """
+        if not self.ingestion_api_keys_raw:
+            return []
+        return [
+            key.strip()
+            for key in self.ingestion_api_keys_raw.split(",")
+            if key.strip()
+        ]
 
 
 @lru_cache
 def get_settings() -> Settings:
-    """Load and cache settings once per process."""
-    try:
-        settings = Settings()
-    except ValidationError as exc:
-        logger.error("Failed to load Settings from environment: %s", exc, exc_info=True)
-        raise
-
+    """
+    Cached settings loader so config is evaluated once per process.
+    """
+    settings = Settings()
     logger.info(
-        "Settings loaded for environment=%s debug=%s db=%s",
+        "Settings loaded (env=%s, debug=%s)",
         settings.environment,
         settings.debug,
-        settings.database_url,
     )
     return settings
 
 
-# Eager, cached singleton for modules that just import `settings`
+# Singleton used everywhere else
 settings: Settings = get_settings()

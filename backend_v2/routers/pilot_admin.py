@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from sqlmodel import Session, select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from backend_v2.config import settings
 from backend_v2.db import get_db
@@ -47,9 +48,13 @@ def list_pilots(request: Request, db: Session = Depends(get_db)) -> HTMLResponse
     The template is responsible for computing / displaying the KPI tiles;
     we just pass the ordered list of pilots.
     """
-    pilots: List[Pilot] = db.exec(
-        select(Pilot).order_by(Pilot.requested_at.desc())
-    ).all()
+    pilots: List[Pilot] = (
+        db.execute(
+            select(Pilot).order_by(Pilot.requested_at.desc())
+        )
+        .scalars()
+        .all()
+    )
 
     return templates.TemplateResponse(
         "admin_pilots.html",
@@ -61,7 +66,10 @@ def list_pilots(request: Request, db: Session = Depends(get_db)) -> HTMLResponse
 
 
 @router.post("/admin/pilots/{pilot_id}/approve", response_model=ApprovePilotResponse)
-def approve_pilot(pilot_id: int, db: Session = Depends(get_db)) -> ApprovePilotResponse:
+def approve_pilot(
+    pilot_id: int,
+    db: Session = Depends(get_db),
+) -> ApprovePilotResponse:
     """
     Approve a pilot and send the Stripe checkout link.
 
@@ -168,6 +176,8 @@ def approve_pilot(pilot_id: int, db: Session = Depends(get_db)) -> ApprovePilotR
 
     return ApprovePilotResponse(
         id=pilot.id,
-        status=str(pilot.status.value if hasattr(pilot.status, "value") else pilot.status),
+        status=str(
+            pilot.status.value if hasattr(pilot.status, "value") else pilot.status
+        ),
         checkout_url=checkout_url,
     )

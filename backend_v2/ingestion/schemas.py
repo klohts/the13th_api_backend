@@ -1,7 +1,7 @@
 import datetime
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
 class LeadWebhookPayload(BaseModel):
@@ -11,10 +11,22 @@ class LeadWebhookPayload(BaseModel):
         default=None,
         description="Identifier for the brokerage/tenant (external or internal key).",
     )
-    source: str = Field(..., description="Lead source identifier (e.g., 'facebook', 'website', 'google').")
-    full_name: Optional[str] = Field(default=None, description="Lead full name, if available.")
-    email: Optional[EmailStr] = Field(default=None, description="Lead email address.")
-    phone: Optional[str] = Field(default=None, description="Lead phone number (raw string).")
+    source: str = Field(
+        ...,
+        description="Lead source identifier (e.g., 'facebook', 'website', 'google').",
+    )
+    full_name: Optional[str] = Field(
+        default=None,
+        description="Lead full name, if available.",
+    )
+    email: Optional[EmailStr] = Field(
+        default=None,
+        description="Lead email address.",
+    )
+    phone: Optional[str] = Field(
+        default=None,
+        description="Lead phone number (raw string).",
+    )
     assigned_agent: Optional[str] = Field(
         default=None,
         description="Optional agent identifier or name, if routing is handled upstream.",
@@ -43,8 +55,8 @@ class LeadResponse(BaseModel):
     external_id: Optional[str] = None
     created_at: datetime.datetime
 
-    class Config:
-        orm_mode = True
+    # Pydantic v2: enable from_orm / from_attributes
+    model_config = ConfigDict(from_attributes=True)
 
 
 class BulkCSVIngestResponse(BaseModel):
